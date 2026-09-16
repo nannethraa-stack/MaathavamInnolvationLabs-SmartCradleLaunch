@@ -1,0 +1,86 @@
+SMART CRADLE CRY PATTERN BASELINE
+=================================
+Model: RandomForestClassifier
+Features: 64 Mel mean + 64 Mel std
+Evaluation: 5-fold source-grouped CV
+Class weighting: balanced
+
+FOLD 1
+Windows: 398
+Macro-F1: 0.1897
+              precision    recall  f1-score   support
+
+  belly_pain       0.00      0.00      0.00        16
+     burping       0.00      0.00      0.00         4
+  discomfort       0.14      0.05      0.07        21
+      hungry       0.80      0.97      0.88       318
+       tired       0.00      0.00      0.00        39
+
+    accuracy                           0.78       398
+   macro avg       0.19      0.20      0.19       398
+weighted avg       0.64      0.78      0.70       398
+
+FOLD 2
+Windows: 411
+Macro-F1: 0.1727
+              precision    recall  f1-score   support
+
+  belly_pain       0.00      0.00      0.00        13
+     burping       0.00      0.00      0.00        15
+  discomfort       0.00      0.00      0.00        32
+      hungry       0.79      0.95      0.86       328
+       tired       0.00      0.00      0.00        23
+
+    accuracy                           0.75       411
+   macro avg       0.16      0.19      0.17       411
+weighted avg       0.63      0.75      0.69       411
+
+FOLD 3
+Windows: 407
+Macro-F1: 0.1883
+              precision    recall  f1-score   support
+
+  belly_pain       0.00      0.00      0.00         0
+     burping       0.00      0.00      0.00        10
+  discomfort       0.00      0.00      0.00        19
+      hungry       0.92      0.97      0.94       374
+       tired       0.00      0.00      0.00         4
+
+    accuracy                           0.89       407
+   macro avg       0.18      0.19      0.19       407
+weighted avg       0.84      0.89      0.87       407
+
+FOLD 4
+Windows: 415
+Macro-F1: 0.1722
+              precision    recall  f1-score   support
+
+  belly_pain       0.00      0.00      0.00        45
+     burping       0.00      0.00      0.00         5
+  discomfort       0.00      0.00      0.00        24
+      hungry       0.76      0.99      0.86       312
+       tired       0.00      0.00      0.00        29
+
+    accuracy                           0.75       415
+   macro avg       0.15      0.20      0.17       415
+weighted avg       0.57      0.75      0.65       415
+
+FOLD 5
+Windows: 404
+Macro-F1: 0.1879
+              precision    recall  f1-score   support
+
+  belly_pain       0.00      0.00      0.00         0
+     burping       0.00      0.00      0.00         4
+  discomfort       0.00      0.00      0.00        24
+      hungry       0.90      0.99      0.94       362
+       tired       0.00      0.00      0.00        14
+
+    accuracy                           0.89       404
+   macro avg       0.18      0.20      0.19       404
+weighted avg       0.80      0.89      0.84       404
+
+SUMMARY
+=======
+Mean Macro-F1: 0.1822
+Std Macro-F1: 0.0079
