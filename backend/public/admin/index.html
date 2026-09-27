@@ -11,7 +11,7 @@
 <section id="command" class="view active"><div class="kpis" id="kpis"></div><div id="pipeline" class="section"><h3>Data Intelligence Pipeline</h3><span>Traceable from sensor to care information</span></div><div class="card panel"><div class="pipeline"><div class="stage active"><span class="n">01 / INGEST</span><b>Raw Data</b><p>Device telemetry, audio, imaging and sensor events.</p></div><div class="stage active"><span class="n">02 / PROCESS</span><b>Signal Intelligence</b><p>Filtering, synchronisation and normalization.</p></div><div class="stage active"><span class="n">03 / VALIDATE</span><b>Validation</b><p>Baselines, artifacts and measurement rules.</p></div><div class="stage active"><span class="n">04 / INTERPRET</span><b>AI + Fusion</b><p>Cry intelligence and multi-sensor reasoning.</p></div><div class="stage active"><span class="n">05 / DELIVER</span><b>Care Information</b><p>Validated outputs for people and systems.</p></div></div></div>
 <div class="section"><h3>Live System Pulse</h3><span>Auto-refresh every 10 seconds Â· Hardware telemetry only</span></div><div class="grid3"><div class="card panel"><div class="panelhead"><b>Telemetry Activity</b><span class="badge">Live</span></div><div class="signal" id="pulseChart"></div></div><div class="card panel"><div class="panelhead"><b>Device Health</b><span class="badge">Fleet</span></div><div id="healthMini"></div></div><div class="card panel"><div class="panelhead"><b>Intelligence Runtime</b><span class="badge">AI</span></div><div class="metricrow"><div class="metricbox"><div class="k">Cry inference</div><div class="v" id="aiStatus">READY</div></div><div class="metricbox"><div class="k">Fusion engine</div><div class="v green">ACTIVE</div></div><div class="metricbox"><div class="k">Data store</div><div class="v green">ONLINE</div></div><div class="metricbox"><div class="k">MQTT link</div><div class="v green">ONLINE</div></div></div></div></div></section>
 <section id="data" class="view"><div class="grid2"><div class="card panel"><div class="panelhead"><b>Raw â†’ Processed Sensor Stream</b><span class="badge">Granular</span></div><div class="controls"><select id="sensor"><option value="">All sensors</option><option>weight</option><option>height</option><option>temperature</option><option>respiratory_rate</option><option>ammonia</option><option>cry_probability</option><option>diaper_weight_delta</option></select><button class="ghost" onclick="loadSamples()">Refresh stream</button></div><div class="tablewrap"><table><thead><tr><th>Timestamp</th><th>Sensor</th><th>Raw</th><th>Processed</th><th>Unit</th><th>Status</th></tr></thead><tbody id="samples"></tbody></table></div></div><div class="card panel"><div class="panelhead"><b>Telemetry Lineage</b><span class="badge">Trace</span></div><div class="flow" style="margin-bottom:15px"><span class="chip">Sensor</span><span class="arrow">â†’</span><span class="chip">Filter</span><span class="arrow">â†’</span><span class="chip">Baseline</span><span class="arrow">â†’</span><span class="chip">Validate</span><span class="arrow">â†’</span><span class="chip">AI/Fusion</span></div><div id="latestLineage"></div></div></div><div class="section"><h3>Latest Telemetry Records</h3><span>Raw payload and processing metadata</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Device</th><th>Weight</th><th>Height</th><th>Temp</th><th>Resp.</th><th>Ammonia</th><th>Cry</th><th>Diaper</th><th>Validation</th></tr></thead><tbody id="telemetry"></tbody></table></div></div></section>
-<section id="ai" class="view"><div class="grid3"><div class="card panel"><div class="panelhead"><b>Cry Intelligence</b><span class="badge">ML</span></div><div class="flow"><span class="chip">Microphone</span><span class="arrow">â†’</span><span class="chip">Noise reduction</span><span class="arrow">â†’</span><span class="chip">Cry detector</span><span class="arrow">â†’</span><span class="chip">Pattern model</span></div><div style="margin-top:15px" id="crySummary"></div></div><div class="card panel"><div class="panelhead"><b>Diaper Sensor Fusion</b><span class="badge">Fusion</span></div><div class="flow"><span class="chip">Ammonia</span><span class="arrow">+</span><span class="chip">Weight delta</span><span class="arrow">+</span><span class="chip">Baseline</span></div><div style="margin-top:15px" id="diaperSummary"></div></div><div class="card panel"><div class="panelhead"><b>Model Runtime</b><span class="badge">Internal</span></div><div id="modelSummary"></div></div></div><div class="section"><h3>Cry Inference History</h3><span>Model-level diagnostics Â· Admin only</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Model</th><th>Status</th><th>Pattern</th><th>Probability</th><th>Latency</th></tr></thead><tbody id="inferences"></tbody></table></div></div><div class="section"><h3>Cry Review Queue</h3><span>Human verification of cry-pattern predictions</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Cry Event</th><th>AI Pattern</th><th>Confidence</th><th>Review</th></tr></thead><tbody id="cryReviews"></tbody></table></div></div><div class="section"><h3>Retained Cry Events</h3><span>Training-data candidates</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Event</th><th>Samples</th><th>Model</th><th>Eligible</th></tr></thead><tbody id="audio"></tbody></table></div></div></section>
+<section id="ai" class="view"><div class="grid3"><div class="card panel"><div class="panelhead"><b>Cry Intelligence</b><span class="badge">ML</span></div><div class="flow"><span class="chip">Microphone</span><span class="arrow">â†’</span><span class="chip">Noise reduction</span><span class="arrow">â†’</span><span class="chip">Cry detector</span><span class="arrow">â†’</span><span class="chip">Pattern model</span></div><div style="margin-top:15px" id="crySummary"></div></div><div class="card panel"><div class="panelhead"><b>Diaper Sensor Fusion</b><span class="badge">Fusion</span></div><div class="flow"><span class="chip">Ammonia</span><span class="arrow">+</span><span class="chip">Weight delta</span><span class="arrow">+</span><span class="chip">Baseline</span></div><div style="margin-top:15px" id="diaperSummary"></div></div><div class="card panel"><div class="panelhead"><b>Model Runtime</b><span class="badge">Internal</span></div><div id="modelSummary"></div></div></div><div class="section"><h3>Cry Inference History</h3><span>Model-level diagnostics Â· Admin only</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Model</th><th>Status</th><th>Pattern</th><th>Probability</th><th>Latency</th></tr></thead><tbody id="inferences"></tbody></table></div></div><div class="section"><h3>Audio Review Queue</h3><span>Human verification of CRY / NON_CRY and cry-pattern labels</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Cry Event</th><th>AI Pattern</th><th>Confidence</th><th>Review</th></tr></thead><tbody id="cryReviews"></tbody></table></div></div><div class="section"><h3>Retained Audio Events</h3><span>Raw training-data candidates, including non-cry audio</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Event</th><th>Samples</th><th>Model</th><th>Eligible</th></tr></thead><tbody id="audio"></tbody></table></div></div></section>
 <section id="ops" class="view"><div class="grid2"><div class="card panel"><div class="panelhead"><b>Enterprise System Health</b><span class="badge">Runtime</span></div><div id="health"></div></div><div class="card panel"><div class="panelhead"><b>Operational Posture</b><span class="badge">Status</span></div><div class="metricrow"><div class="metricbox"><div class="k">Backend</div><div class="v green">ONLINE</div></div><div class="metricbox"><div class="k">Database</div><div class="v green">ONLINE</div></div><div class="metricbox"><div class="k">WebSocket</div><div class="v green">READY</div></div><div class="metricbox"><div class="k">MQTT</div><div class="v green">CONNECTED</div></div></div></div></div><div class="section"><h3>Event Stream</h3><span>System, sensor and pipeline events</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Severity</th><th>Component</th><th>Event</th><th>Message</th></tr></thead><tbody id="events"></tbody></table></div></div><div class="section"><h3>Anomaly Register</h3><span>Most recent detected anomalies</span></div><div class="card panel"><div class="tablewrap"><table><thead><tr><th>Time</th><th>Device</th><th>Severity</th><th>Type</th><th>Message</th></tr></thead><tbody id="anomalies"></tbody></table></div></div></section>
 <div id="cryReviewModal" style="display:none"></div><div class="footer">SMART CRADLE Â· ENTERPRISE DATA INTELLIGENCE PLATFORM Â· ADMINISTRATIVE / DEMONSTRATION VIEW</div></main></div>
 <script>
@@ -118,7 +118,7 @@ async function reviewCry(windowId){
     m.innerHTML = `
       <div class="cry-review-card">
 
-        <h3>Cry Pattern Review</h3>
+        <h3>Audio Training Review</h3>
 
         <div class="cry-review-grid">
 
@@ -219,18 +219,21 @@ async function reviewCry(windowId){
 
         <h4>Human Review</h4>
 
-        <label>Human Decision</label>
+        <label>Audio Classification / Human Decision</label>
 
         <select id="cryHumanDecision">
           <option value="">Select</option>
-          <option value="CONFIRM">Confirm</option>
-          <option value="CORRECT">Correct</option>
+          <option value="CRY">CRY</option>
+          <option value="NON_CRY">NON_CRY</option>
+          <option value="UNCERTAIN">UNCERTAIN</option>
+          <option value="CONFIRM">Confirm (legacy)</option>
+          <option value="CORRECT">Correct (legacy)</option>
           <option value="UNABLE_TO_DETERMINE">
-            Unable to determine
+            Unable to determine (legacy)
           </option>
         </select>
 
-        <label>Human Pattern</label>
+        <label>Cry Pattern (only when CRY)</label>
 
         <select id="cryHumanPattern">
           <option value="">Select</option>
@@ -307,7 +310,7 @@ async function saveCryReview(audioEventId,deviceId,windowId){
     }
 
     if(
-      decision === 'CORRECT' &&
+      ['CRY','CORRECT'].includes(decision) &&
       !pattern
     ){
       alert('Please select the corrected human pattern.');
@@ -344,7 +347,7 @@ async function saveCryReview(audioEventId,deviceId,windowId){
     await loadAI();
 
     alert(
-      'Cry pattern review saved successfully.'
+      'Audio review saved successfully.'
     );
 
   }catch(e){
