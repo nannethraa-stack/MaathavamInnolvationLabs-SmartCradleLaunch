@@ -1066,7 +1066,7 @@ void publishAudioEvent() {
     "\"occurred_at\":\"%s\",\"sequence_no\":%lu,\"firmware_version\":\"%s\","
     "\"payload\":{\"sample_rate\":16000,\"channels\":1,\"sample_count\":%d,"
     "\"format\":\"pcm_s16le_base64\",\"model_version\":\"edge-rms-v0\","
-    "\"training_eligible\":true,\"data\":\"%s\"}}",
+    "\"training_eligible\":true,\"audio_class_hint\":\"%s\",\"data\":\"%s\"}}",
     uuid, DEVICE_UUID, ts, sequenceCounter++, FIRMWARE_VER,
     g_pcmSamplesRead,
     g_isCrying ? "CRY_CANDIDATE" : "NON_CRY_CANDIDATE",
