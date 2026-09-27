@@ -173,6 +173,11 @@ volatile int g_pcmSamplesRead    = 0;
 volatile bool g_pcmDataReady     = false;
 const float CRYING_RMS_THRESHOLD = 1500.0f;
 const int   CRYING_DURATION_MS   = 3000;
+
+// Training-data capture. When enabled, the microphone stream is published
+// while a baby is present so the backend can construct exact 3-second windows
+// containing both CRY and NON_CRY audio. Human review remains the label source.
+const bool AUDIO_TRAINING_CAPTURE_ENABLED = true;
 unsigned long g_cryStartMs       = 0;
 bool        g_isCrying           = false;
 
@@ -451,10 +456,13 @@ void loop() {
   interrupts();
   if (pcmReady) {
     processAudio();
-    if (g_cryAudioEventPending) {
-      publishCryAudioEvent();
-      g_cryAudioEventPending = false;
+
+    if (AUDIO_TRAINING_CAPTURE_ENABLED &&
+        g_presenceState == BABY_PRESENT) {
+      publishAudioEvent();
     }
+
+    g_cryAudioEventPending = false;
   }
 
   // ------------------------------------------------------------------
@@ -1023,8 +1031,8 @@ void publishTelemetry() {
 }
 
 
-void publishCryAudioEvent() {
-  if (!mqttClient.connected() || !g_isCrying || g_pcmSamplesRead <= 0) return;
+void publishAudioEvent() {
+  if (!mqttClient.connected() || g_pcmSamplesRead <= 0) return;
 
   // Store the latest validated noise-reduced detector window as a training
   // candidate. A future recorder can replace this with a longer rolling clip.
@@ -1060,7 +1068,9 @@ void publishCryAudioEvent() {
     "\"format\":\"pcm_s16le_base64\",\"model_version\":\"edge-rms-v0\","
     "\"training_eligible\":true,\"data\":\"%s\"}}",
     uuid, DEVICE_UUID, ts, sequenceCounter++, FIRMWARE_VER,
-    g_pcmSamplesRead, b64buf);
+    g_pcmSamplesRead,
+    g_isCrying ? "CRY_CANDIDATE" : "NON_CRY_CANDIDATE",
+    b64buf);
 
   if (n <= 0 || n >= (int)sizeof(json)) {
     Serial.println("ERROR: Cry audio event JSON truncated.");
@@ -1071,7 +1081,7 @@ void publishCryAudioEvent() {
   mqttClient.print(json);
   mqttClient.endMessage();
   g_cryEventCounter++;
-  Serial.print("[CRY AUDIO] Training candidate stored, samples=");
+  Serial.print("[AUDIO CAPTURE] Training candidate stored, samples=");
   Serial.println(g_pcmSamplesRead);
 }
 
