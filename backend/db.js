@@ -54,6 +54,7 @@ db.exec(`
     event_id TEXT UNIQUE,
     device_id TEXT,
     occurred_at TEXT,
+    event_type TEXT,
     baby_present INTEGER,
     previous_state TEXT,
     current_state TEXT,
@@ -109,6 +110,7 @@ db.exec(`
     format TEXT,
     model_version TEXT,
     training_eligible INTEGER DEFAULT 0,
+    capture_class_hint TEXT,
     data_base64 TEXT,
     received_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
@@ -210,6 +212,8 @@ function ensureColumn(table, column, definition) {
 }
 
 // Safe migrations for databases created by v1/v2.
+ensureColumn('audio_events', 'event_type', 'TEXT');
+ensureColumn('audio_events', 'capture_class_hint', 'TEXT');
 ensureColumn('cry_reviews', 'window_id', 'TEXT');
 [
   ['telemetry', 'cry_detected', 'INTEGER'],
@@ -347,23 +351,25 @@ function insertAudioEvent(data) {
   const p = data.payload || {};
   return db.prepare(`
     INSERT OR IGNORE INTO audio_events
-    (event_id, device_id, occurred_at, sample_rate, channels, sample_count, format,
-     model_version, training_eligible, data_base64)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (event_id, device_id, occurred_at, event_type, sample_rate, channels, sample_count, format,
+     model_version, training_eligible, capture_class_hint, data_base64)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     data.event_id, data.device_id, data.occurred_at,
+    data.event_type ?? 'AUDIO_EVENT',
     p.sample_rate ?? 16000, p.channels ?? 1, p.sample_count ?? null,
     p.format ?? 'pcm_s16le_base64',
     p.model_version ?? 'cry-detector-placeholder',
     p.training_eligible ? 1 : 0,
+    p.audio_class_hint ?? null,
     p.data ?? null
   );
 }
 
 function getAudioEvents(deviceId, limit = 100) {
   return db.prepare(`
-    SELECT id,event_id,device_id,occurred_at,sample_rate,channels,sample_count,
-           format,model_version,training_eligible,received_at
+    SELECT id,event_id,device_id,occurred_at,event_type,sample_rate,channels,sample_count,
+           format,model_version,training_eligible,capture_class_hint,received_at
     FROM audio_events WHERE device_id = ?
     ORDER BY occurred_at DESC LIMIT ?
   `).all(deviceId, limit);
@@ -638,6 +644,36 @@ function getShareToken(tokenHash) {
 
 function revokeShareToken(tokenHash) {
   return db.prepare(`UPDATE share_tokens SET revoked = 1 WHERE token_hash = ?`).run(tokenHash);
+}
+
+
+function getTrainingStats(deviceId = null) {
+  const where = deviceId ? ' WHERE r.device_id = ?' : '';
+  const args = deviceId ? [deviceId] : [];
+
+  const rows = db.prepare(
+    `SELECT
+       COALESCE(r.human_decision, 'UNREVIEWED') AS classification,
+       COALESCE(r.human_pattern, '-') AS pattern,
+       COALESCE(r.training_status, 'CANDIDATE') AS training_status,
+       COUNT(*) AS count
+     FROM cry_reviews r${where}
+     GROUP BY classification, pattern, training_status
+     ORDER BY classification, pattern, training_status`
+  ).all(...args);
+
+  const totals = db.prepare(
+    `SELECT
+       COUNT(*) AS review_candidates,
+       SUM(CASE WHEN human_decision = 'NON_CRY' THEN 1 ELSE 0 END) AS non_cry,
+       SUM(CASE WHEN human_decision = 'CRY' THEN 1 ELSE 0 END) AS cry,
+       SUM(CASE WHEN human_decision = 'UNCERTAIN' THEN 1 ELSE 0 END) AS uncertain,
+       SUM(CASE WHEN training_status = 'APPROVED' THEN 1 ELSE 0 END) AS approved,
+       SUM(CASE WHEN training_status = 'EXCLUDED' THEN 1 ELSE 0 END) AS excluded
+     FROM cry_reviews${where}`
+  ).get(...args);
+
+  return { totals, breakdown: rows };
 }
 
 function getAdminCounts() {
