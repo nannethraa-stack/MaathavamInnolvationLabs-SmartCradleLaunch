@@ -104,6 +104,7 @@ db.exec(`
     event_id TEXT UNIQUE,
     device_id TEXT,
     occurred_at TEXT,
+    event_type TEXT,
     sample_rate INTEGER,
     channels INTEGER,
     sample_count INTEGER,
