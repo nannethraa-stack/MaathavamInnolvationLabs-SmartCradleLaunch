@@ -214,6 +214,10 @@ app.post('/admin/cry-reviews', express.json({ limit: '1mb' }), (req, res) => {
   });
 });
 
+app.get('/admin/training/stats', (req, res) => {
+  res.json(db.getTrainingStats(req.query.deviceId || null));
+});
+
 app.get('/admin/stats', (req, res) => {
   const summary = monitoring.getHealthSummary();
   const memUsage = process.memoryUsage();
