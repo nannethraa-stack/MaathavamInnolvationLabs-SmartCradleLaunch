@@ -1062,7 +1062,7 @@ void publishAudioEvent() {
 
   char json[15000];
   int n = snprintf(json, sizeof(json),
-    "{\"event_id\":\"%s\",\"device_id\":\"%s\",\"event_type\":\"CRY_AUDIO_EVENT\","
+    "{\"event_id\":\"%s\",\"device_id\":\"%s\",\"event_type\":\"AUDIO_EVENT\","
     "\"occurred_at\":\"%s\",\"sequence_no\":%lu,\"firmware_version\":\"%s\","
     "\"payload\":{\"sample_rate\":16000,\"channels\":1,\"sample_count\":%d,"
     "\"format\":\"pcm_s16le_base64\",\"model_version\":\"edge-rms-v0\","
