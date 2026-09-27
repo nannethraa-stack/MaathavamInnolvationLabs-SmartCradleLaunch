@@ -21,9 +21,23 @@ sudo apt install -y mosquitto mosquitto-clients
 
 # Configure Mosquitto
 echo "[4/8] Configuring Mosquitto..."
+if [ -z "${MQTT_USERNAME:-}" ] || [ -z "${MQTT_PASSWORD:-}" ]; then
+    echo "ERROR: MQTT_USERNAME and MQTT_PASSWORD must be set before deployment."
+    echo 'Example: export MQTT_USERNAME=smartcradle'
+    echo '         export MQTT_PASSWORD=<strong-random-password>'
+    exit 1
+fi
+
+sudo install -d -m 750 /etc/mosquitto
+sudo touch /etc/mosquitto/passwd
+sudo chmod 640 /etc/mosquitto/passwd
+sudo chown root:mosquitto /etc/mosquitto/passwd
+sudo mosquitto_passwd -b /etc/mosquitto/passwd "$MQTT_USERNAME" "$MQTT_PASSWORD"
+
 sudo tee /etc/mosquitto/conf.d/default.conf > /dev/null <<EOF
 listener 1883 0.0.0.0
-allow_anonymous true
+allow_anonymous false
+password_file /etc/mosquitto/passwd
 EOF
 
 sudo systemctl enable mosquitto
@@ -89,10 +103,10 @@ PUBLIC_IP=$(curl -s ifconfig.me)
 echo ""
 echo "=== Deployment Complete ==="
 echo "Dashboard URL: http://$PUBLIC_IP:3001"
-echo "MQTT Broker: $PUBLIC_IP:1883"
+echo "MQTT Broker: $PUBLIC_IP:1883 (authenticated MQTT)"
 echo ""
 echo "Next steps:"
-echo "1. Update device firmware MQTT_BROKER_IP to: $PUBLIC_IP"
+echo "1. Update device firmware MQTT_BROKER_IP to: $PUBLIC_IP and MQTT credentials to the configured values"
 echo "2. Open browser to: http://$PUBLIC_IP:3001"
 echo ""
 echo "Useful commands:"
