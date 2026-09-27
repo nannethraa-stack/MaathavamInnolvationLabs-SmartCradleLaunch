@@ -17,39 +17,6 @@
 <script>
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let currentView='command', demo=false, deviceId='';
-function showView(view){
-  const titles={
-    command:['Command Center','A live operational view of the Smart Cradle data platform.'],
-    data:['Data Observatory','Raw telemetry, processing lineage and validated sensor data.'],
-    ai:['AI & Fusion','Cry intelligence, model runtime and human verification.'],
-    ops:['Operations','Device health, operational events and system anomalies.']
-  };
-
-  document.querySelectorAll('.view').forEach(v=>{
-    v.classList.toggle('active',v.id===view);
-  });
-
-  document.querySelectorAll('.navbtn').forEach(btn=>{
-    btn.classList.toggle('active',btn.dataset.view===view);
-  });
-
-  currentView=view;
-
-  const meta=titles[view]||titles.command;
-  heroTitle.textContent=meta[0];
-  heroDesc.textContent=meta[1];
-
-  if(view==='data') loadData();
-  if(view==='ai') loadAI();
-  if(view==='ops') loadOps();
-}
-
-document.querySelectorAll('.navbtn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    showView(btn.dataset.view);
-  });
-});
-
 async function get(url){const r=await fetch(url);if(!r.ok)throw Error(await r.text());return r.json()}
 function fmt(s){let h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h+'h '+m+'m'}
 function toggleDemo(){demo=!demo;document.body.classList.toggle('demo',demo);$('demoBtn').classList.toggle('on',demo);$('demoBtn').textContent=demo?'Engineering View':'Executive Demo';if(demo)showView('command')}
@@ -271,7 +238,7 @@ async function reviewCry(windowId){
             class="primary"
             onclick="saveCryReview(
               '${esc(r.audio_event_id || '')}',
-              '${esc(r.device_id || deviceId)}',
+              '${esc(r.device_id || currentDeviceId)}',
               '${esc(r.window_id || '')}'
             )"
           >
@@ -351,15 +318,11 @@ async function saveCryReview(audioEventId,deviceId,windowId){
     alert(e.message);
   }
 }
-async function loadAI(){if(!$('device').value){['crySummary','diaperSummary','modelSummary','inferences','audio'].forEach(id=>$(id).innerHTML='<div class="empty">Select a device to inspect AI runtime.</div>');return}const id=encodeURIComponent($('device').value);const [inf,audio,t,reviews]=await Promise.all([get('/admin/cry-inferences?deviceId='+id+'&limit=80'),get('/admin/audio?deviceId='+id+'&limit=80'),get('/admin/telemetry?limit=1&deviceId='+id),get('/admin/cry-reviews?deviceId='+id+'&limit=80')]);const l=t[0]||{};$('crySummary').innerHTML=`<div class="metricrow"><div class="metricbox"><div class="k">Latest cry</div><div class="v">${l.cry_detected?'DETECTED':'QUIET'}</div></div><div class="metricbox"><div class="k">Probable pattern</div><div class="v">${esc(l.probable_pattern||'Analysingâ€¦')}</div></div></div>`;$('diaperSummary').innerHTML=`<div class="metricrow"><div class="metricbox"><div class="k">Status</div><div class="v">${esc(l.diaper_status||'â€”')}</div></div><div class="metricbox"><div class="k">Weight delta</div><div class="v">${esc(l.diaper_weight_delta_g??'â€”')} g</div></div></div><div class="sub" style="margin-top:10px">${esc(l.diaper_fusion_reason||'Waiting for multi-sensor fusion input.')}</div>`;$('modelSummary').innerHTML=`<div class="healthrow"><span>Cry detector</span><b class="green">${esc(l.cry_model_version||'placeholder')}</b></div><div class="healthrow"><span>Inference history</span><b>${inf.length}</b></div><div class="healthrow"><span>Audio candidates</span><b>${audio.length}</b></div>`;$('inferences').innerHTML=inf.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.model_version)}</td><td>${esc(r.status)}</td><td>${esc(r.probable_pattern||'â€”')}</td><td>${r.probability==null?'â€”':(Number(r.probability)*100).toFixed(1)+'%'}</td><td>${esc(r.inference_ms??'â€”')} ms</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No inference records</td></tr>';$('cryReviews').innerHTML=reviews.map(r=>`<tr><td>${esc(r.occurred_at||r.created_at||'-')}</td><td>${esc(r.audio_event_id||'-')}</td><td>${esc(r.ai_probable_pattern||'-')}</td><td>${r.ai_probability==null?'-':(Number(r.ai_probability)*100).toFixed(1)+'%'}</td><td><button class="btn" onclick="reviewCry('${esc(r.window_id || r.audio_event_id || '')}')">Review</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No cry reviews</td></tr>';$('audio').innerHTML=audio.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.event_id)}</td><td>${esc(r.sample_count??'â€”')}</td><td>${esc(r.model_version)}</td><td>${r.training_eligible?'YES':'NO'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No retained cry events</td></tr>'}
+async function loadAI(){if(!$('device').value){['crySummary','diaperSummary','modelSummary','inferences','audio'].forEach(id=>$(id).innerHTML='<div class="empty">Select a device to inspect AI runtime.</div>');return}const id=encodeURIComponent($('device').value);const [inf,audio,t,reviews]=await Promise.all([get('/admin/cry-inferences?deviceId='+id+'&limit=80'),get('/admin/audio?deviceId='+id+'&limit=80'),get('/admin/telemetry?limit=1&deviceId='+id),get('/admin/cry-reviews?deviceId='+id+'&limit=80')]);const l=t[0]||{};$('crySummary').innerHTML=`<div class="metricrow"><div class="metricbox"><div class="k">Latest cry</div><div class="v">${l.cry_detected?'DETECTED':'QUIET'}</div></div><div class="metricbox"><div class="k">Probable pattern</div><div class="v">${esc(l.probable_pattern||'Analysingâ€¦')}</div></div></div>`;$('diaperSummary').innerHTML=`<div class="metricrow"><div class="metricbox"><div class="k">Status</div><div class="v">${esc(l.diaper_status||'â€”')}</div></div><div class="metricbox"><div class="k">Weight delta</div><div class="v">${esc(l.diaper_weight_delta_g??'â€”')} g</div></div></div><div class="sub" style="margin-top:10px">${esc(l.diaper_fusion_reason||'Waiting for multi-sensor fusion input.')}</div>`;$('modelSummary').innerHTML=`<div class="healthrow"><span>Cry detector</span><b class="green">${esc(l.cry_model_version||'placeholder')}</b></div><div class="healthrow"><span>Inference history</span><b>${inf.length}</b></div><div class="healthrow"><span>Audio candidates</span><b>${audio.length}</b></div>`;$('inferences').innerHTML=inf.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.model_version)}</td><td>${esc(r.status)}</td><td>${esc(r.probable_pattern||'â€”')}</td><td>${r.probability==null?'â€”':(Number(r.probability)*100).toFixed(1)+'%'}</td><td>${esc(r.inference_ms??'â€”')} ms</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No inference records</td></tr>';$('cryReviews').innerHTML=reviews.map(r=>`<tr><td>${esc(r.occurred_at||r.created_at||'-')}</td><td>${esc(r.audio_event_id||'-')}</td><td>${esc(r.ai_probable_pattern||'-')}</td><td>${r.ai_probability==null?'-':(Number(r.ai_probability)*100).toFixed(1)+'%'}</td><td><button class="btn" onclick="reviewCry('${esc(r.audio_event_id||'')}')">Review</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No cry reviews</td></tr>';$('audio').innerHTML=audio.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.event_id)}</td><td>${esc(r.sample_count??'â€”')}</td><td>${esc(r.model_version)}</td><td>${r.training_eligible?'YES':'NO'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No retained cry events</td></tr>'}
 async function loadOps(){const [ds,ev,an]=await Promise.all([get('/admin/devices'),get('/admin/events?limit=180'),get('/admin/anomalies?limit=100')]);const d=$('device').value?ds.find(x=>x.deviceId===$('device').value):ds[0];$('health').innerHTML=d?`<div class="healthrow"><span>Device</span><b>${esc(d.deviceId)}</b></div><div class="healthrow"><span>Overall status</span><b class="${d.status==='online'?'green':'amber'}">${esc(d.status)}</b></div>`+Object.entries(d.sensorHealth||{}).map(([k,v])=>`<div class="healthrow"><span>${esc(k)}</span><span class="state"><i class="mini ${v==='online'?'':'warn'}"></i>${esc(v)}</span></div>`).join('')+Object.entries(d.pipeline||{}).map(([k,v])=>`<div class="healthrow"><span>Pipeline / ${esc(k)}</span><b>${esc(v)}</b></div>`).join(''):'<div class="empty">No devices connected</div>';$('events').innerHTML=ev.map(r=>`<tr><td>${esc(r.received_at)}</td><td>${esc(r.severity)}</td><td>${esc(r.component)}</td><td>${esc(r.event_type)}</td><td>${esc(r.message)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No events</td></tr>';$('anomalies').innerHTML=an.map(r=>`<tr><td>${esc(r.timestamp)}</td><td>${esc(r.deviceId)}</td><td>${esc(r.severity)}</td><td>${esc(r.type)}</td><td>${esc(r.message)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No anomalies</td></tr>'}
 async function refreshAll(){try{await loadDevices();await loadCommand();if(currentView==='data')await loadData();if(currentView==='ai')await loadAI();if(currentView==='ops')await loadOps();$('liveText').textContent='LIVE DATA LINK Â· '+new Date().toLocaleTimeString()}catch(e){console.error(e);$('liveText').textContent='DATA LINK ERROR'}}
 $('device').addEventListener('change',()=>{deviceId=$('device').value;refreshAll()});$('sensor').addEventListener('change',loadSamples);refreshAll();setInterval(refreshAll,10000);
 </script></body></html>
-
-
-
-
 
 
 

@@ -1,4 +1,4 @@
-﻿const express = require('express');
+const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
@@ -112,14 +112,6 @@ app.post('/admin/cry-reviews', express.json({ limit: '1mb' }), (req, res) => {
     return res.status(400).json({ error: 'device_id is required' });
   }
 
-  const windowId = body.window_id || null;
-
-  if (windowId !== null && typeof windowId !== 'string') {
-    return res.status(400).json({
-      error: 'window_id must be a string when supplied'
-    });
-  }
-
   const allowedDecisions = [
     'CONFIRM',
     'CORRECT',
@@ -184,7 +176,6 @@ app.post('/admin/cry-reviews', express.json({ limit: '1mb' }), (req, res) => {
   const result = db.insertCryReview({
     audio_event_id: body.audio_event_id,
     device_id: body.device_id,
-    window_id: windowId,
     review_status: reviewStatus,
     human_decision: body.human_decision || null,
     human_pattern: body.human_pattern || null,
@@ -275,4 +266,3 @@ server.listen(PORT, () => {
   console.log(`Admin dashboard: http://localhost:${PORT}/admin/index.html`);
   mqttClient.start();
 });
-

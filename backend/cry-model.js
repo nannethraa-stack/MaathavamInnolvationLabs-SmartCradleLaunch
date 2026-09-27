@@ -1,70 +1,110 @@
-/*
- * Pluggable cry-pattern ML adapter.
+﻿/*
+ * Smart Cradle rolling-window cry-pattern ML adapter.
  *
- * Set CRY_MODEL_URL to a model service trained from the curated audio dataset.
- * The service should accept:
- *   { audio_base64, format, sample_rate, device_id, event_id }
- * and return:
- *   { probable_pattern, probability, model_version, features? }
+ * This adapter receives a COMPLETE 3-second / 48,000-sample
+ * PCM window from the Node rolling buffer.
  *
- * No clinical diagnosis is produced here. "Probable pattern" is intentionally
- * the product-facing term.
+ * It does NOT send individual MQTT audio chunks to the model.
+ *
+ * Product wording:
+ *   "probable cry pattern"
+ *
+ * This is not a medical diagnosis.
  */
-async function analyze(audioEvent) {
-  const url = process.env.CRY_MODEL_URL;
-  if (!url) {
-    return {
-      audio_event_id: audioEvent.event_id,
-      device_id: audioEvent.device_id,
-      occurred_at: audioEvent.occurred_at,
-      status: 'not_configured',
-      model_version: 'cry-pattern-model-not-configured',
-      probable_pattern: 'Analysing...',
-      probability: null,
-      inference_ms: 0,
-      features: {}
-    };
-  }
+
+async function analyze(window) {
+  const url = process.env.CRY_MODEL_URL || 'http://127.0.0.1:8001/infer';
 
   const started = Date.now();
+
   try {
     const response = await fetch(url, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json'
+      },
       body: JSON.stringify({
-        audio_base64: audioEvent.data_base64,
-        format: audioEvent.format,
-        sample_rate: audioEvent.sample_rate,
-        device_id: audioEvent.device_id,
-        event_id: audioEvent.event_id
+        audio_base64: window.audio_base64,
+        format: 'pcm_s16le_base64',
+        sample_rate: window.sample_rate,
+        device_id: window.device_id,
+        event_id: window.last_event_id,
+        window_id: window.window_id
       })
     });
-    if (!response.ok) throw new Error(`model service HTTP ${response.status}`);
+
+    if (!response.ok) {
+      const body = await response.text();
+      throw new Error(
+        `model service HTTP ${response.status}: ${body}`
+      );
+    }
+
     const result = await response.json();
+
     return {
-      audio_event_id: audioEvent.event_id,
-      device_id: audioEvent.device_id,
-      occurred_at: audioEvent.occurred_at,
-      status: 'inference_complete',
-      model_version: result.model_version || 'external-cry-model',
-      probable_pattern: result.probable_pattern || 'Analysing...',
-      probability: Number.isFinite(result.probability) ? result.probability : null,
+      audio_event_id: window.last_event_id || null,
+      device_id: window.device_id,
+      occurred_at: window.occurred_at || null,
+
+      window_id: window.window_id,
+      window_start_at: window.window_start_at || null,
+      window_end_at: window.window_end_at || null,
+      window_sample_count: window.sample_count,
+      source_event_ids: window.source_event_ids || [],
+
+      status: result.model_status || result.status || 'inference_complete',
+      model_version: result.model_version || 'unknown',
+
+      probable_pattern: result.prediction || result.probable_pattern || 'REVIEW',
+      probability: Number.isFinite(result.confidence)
+        ? result.confidence
+        : null,
+
+      probabilities: result.probabilities || {},
+      decision: result.decision || 'REVIEW',
+      needs_review: result.needs_review !== false,
+      uncertainty_reasons: result.uncertainty_reasons || [],
+
       inference_ms: Date.now() - started,
-      features: result.features || {}
+      service_inference_ms: Number.isFinite(result.service_inference_ms)
+        ? result.service_inference_ms
+        : null,
+
+      features: result.feature || {},
+
+      error: null
     };
   } catch (error) {
     return {
-      audio_event_id: audioEvent.event_id,
-      device_id: audioEvent.device_id,
-      occurred_at: audioEvent.occurred_at,
+      audio_event_id: window.last_event_id || null,
+      device_id: window.device_id,
+      occurred_at: window.occurred_at || null,
+
+      window_id: window.window_id,
+      window_start_at: window.window_start_at || null,
+      window_end_at: window.window_end_at || null,
+      window_sample_count: window.sample_count,
+      source_event_ids: window.source_event_ids || [],
+
       status: 'inference_error',
       model_version: 'external-cry-model',
-      probable_pattern: 'Analysing...',
+
+      probable_pattern: 'REVIEW',
       probability: null,
+
+      probabilities: {},
+      decision: 'REVIEW',
+      needs_review: true,
+      uncertainty_reasons: ['inference_error'],
+
       inference_ms: Date.now() - started,
+      service_inference_ms: null,
+
       features: {},
       error: error.message
     };
   }
 }
+
 module.exports = { analyze };

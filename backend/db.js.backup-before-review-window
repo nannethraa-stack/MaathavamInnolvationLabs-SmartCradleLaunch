@@ -447,9 +447,8 @@ function insertCryReview(review) {
   return db.prepare(`
     INSERT INTO cry_reviews
     (audio_event_id, device_id, review_status, human_decision,
-     human_pattern, evidence_note, training_status, reviewer,
-     reviewed_at, window_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+     human_pattern, evidence_note, training_status, reviewer, reviewed_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     review.audio_event_id,
     review.device_id ?? null,
@@ -459,8 +458,7 @@ function insertCryReview(review) {
     review.evidence_note ?? null,
     review.training_status ?? 'CANDIDATE',
     review.reviewer ?? null,
-    review.reviewed_at ?? null,
-    review.window_id ?? null
+    review.reviewed_at ?? null
   );
 }
 
@@ -473,37 +471,39 @@ function getCryReviews(deviceId, limit = 100) {
       a.channels,
       a.sample_count,
       a.format,
-
-      ci.model_version AS ai_model_version,
-      ci.probable_pattern AS ai_probable_pattern,
-      ci.probability AS ai_probability,
-      ci.status AS ai_status,
-      ci.window_start_at AS ai_window_start_at,
-      ci.window_end_at AS ai_window_end_at,
-      ci.window_sample_count AS ai_window_sample_count,
-      ci.probabilities_json AS ai_probabilities_json,
-      ci.decision AS ai_decision,
-      ci.needs_review AS ai_needs_review,
-      ci.uncertainty_reasons_json AS ai_uncertainty_reasons_json,
-      ci.service_inference_ms AS ai_service_inference_ms,
-      ci.inference_ms AS ai_inference_ms
-
+      (
+        SELECT ci.model_version
+        FROM cry_inferences ci
+        WHERE ci.audio_event_id = r.audio_event_id
+        ORDER BY ci.occurred_at DESC, ci.id DESC
+        LIMIT 1
+      ) AS ai_model_version,
+      (
+        SELECT ci.probable_pattern
+        FROM cry_inferences ci
+        WHERE ci.audio_event_id = r.audio_event_id
+        ORDER BY ci.occurred_at DESC, ci.id DESC
+        LIMIT 1
+      ) AS ai_probable_pattern,
+      (
+        SELECT ci.probability
+        FROM cry_inferences ci
+        WHERE ci.audio_event_id = r.audio_event_id
+        ORDER BY ci.occurred_at DESC, ci.id DESC
+        LIMIT 1
+      ) AS ai_probability,
+      (
+        SELECT ci.status
+        FROM cry_inferences ci
+        WHERE ci.audio_event_id = r.audio_event_id
+        ORDER BY ci.occurred_at DESC, ci.id DESC
+        LIMIT 1
+      ) AS ai_status
     FROM cry_reviews r
-
     LEFT JOIN audio_events a
       ON a.event_id = r.audio_event_id
-
-    LEFT JOIN cry_inferences ci
-      ON (
-        (r.window_id IS NOT NULL AND ci.window_id = r.window_id)
-        OR
-        (r.window_id IS NULL AND ci.audio_event_id = r.audio_event_id)
-      )
-
     WHERE r.device_id = ?
-
-    ORDER BY r.created_at DESC, ci.id DESC
-
+    ORDER BY r.created_at DESC
     LIMIT ?
   `).all(deviceId, limit);
 }
@@ -658,6 +658,5 @@ module.exports = {
   getAdminCounts,
   getPublicSnapshot
 };
-
 
 

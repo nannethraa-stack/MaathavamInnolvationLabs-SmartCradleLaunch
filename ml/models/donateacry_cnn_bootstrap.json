@@ -1,0 +1,58 @@
+{
+  "model_version": "donateacry-cnn-bootstrap-v1",
+  "model_status": "BOOTSTRAP_NOT_PRODUCTION",
+  "created_at_utc": "2026-09-20T06:23:33.152408+00:00",
+  "dataset": {
+    "name": "Donate-a-Cry",
+    "windows": 2035,
+    "source_recordings": 221,
+    "folds": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "classes": [
+      "belly_pain",
+      "burping",
+      "discomfort",
+      "hungry",
+      "tired"
+    ]
+  },
+  "features": {
+    "file": "C:\\Users\\Yoga\\Downloads\\smart-cradle-enterprise-observatory-hardware-only\\ml\\data\\processed\\donateacry_logmel.npz",
+    "representation": "log-mel spectrogram",
+    "input_shape": [
+      64,
+      188
+    ]
+  },
+  "training": {
+    "epochs": 15,
+    "batch_size": 32,
+    "learning_rate": 0.001,
+    "random_seed": 42
+  },
+  "evaluation": {
+    "method": "5-fold source-grouped CV",
+    "mean_macro_f1": 0.13650002112673354,
+    "std_macro_f1": 0.058188417605758117,
+    "fold_macro_f1": [
+      0.1212635637222896,
+      0.029271454498314753,
+      0.16916299559471365,
+      0.17432041642567958,
+      0.18848167539267016
+    ]
+  },
+  "production_requirements_remaining": [
+    "real non-cry dataset",
+    "OTHER class data",
+    "Smart Cradle production recordings",
+    "human-curated labels",
+    "production grouped train/validation/test split",
+    "uncertainty calibration"
+  ]
+}

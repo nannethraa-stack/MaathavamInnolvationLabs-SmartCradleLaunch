@@ -17,351 +17,129 @@
 <script>
 const $=id=>document.getElementById(id), esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let currentView='command', demo=false, deviceId='';
-function showView(view){
-  const titles={
-    command:['Command Center','A live operational view of the Smart Cradle data platform.'],
-    data:['Data Observatory','Raw telemetry, processing lineage and validated sensor data.'],
-    ai:['AI & Fusion','Cry intelligence, model runtime and human verification.'],
-    ops:['Operations','Device health, operational events and system anomalies.']
-  };
-
-  document.querySelectorAll('.view').forEach(v=>{
-    v.classList.toggle('active',v.id===view);
-  });
-
-  document.querySelectorAll('.navbtn').forEach(btn=>{
-    btn.classList.toggle('active',btn.dataset.view===view);
-  });
-
-  currentView=view;
-
-  const meta=titles[view]||titles.command;
-  heroTitle.textContent=meta[0];
-  heroDesc.textContent=meta[1];
-
-  if(view==='data') loadData();
-  if(view==='ai') loadAI();
-  if(view==='ops') loadOps();
-}
-
-document.querySelectorAll('.navbtn').forEach(btn=>{
-  btn.addEventListener('click',()=>{
-    showView(btn.dataset.view);
-  });
-});
-
 async function get(url){const r=await fetch(url);if(!r.ok)throw Error(await r.text());return r.json()}
 function fmt(s){let h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h+'h '+m+'m'}
 function toggleDemo(){demo=!demo;document.body.classList.toggle('demo',demo);$('demoBtn').classList.toggle('on',demo);$('demoBtn').textContent=demo?'Engineering View':'Executive Demo';if(demo)showView('command')}
-async function reviewCry(windowId){
+async function reviewCry(audioEventId){
   try{
-    const reviews = await get(
-      '/admin/cry-reviews?deviceId=' +
-      encodeURIComponent(deviceId) +
-      '&limit=100'
-    );
+    const reviews=await get('/admin/cry-reviews?deviceId='+encodeURIComponent(currentDeviceId)+'&limit=80');
+    const r=reviews.find(x=>x.audio_event_id===audioEventId);
+    if(!r){alert('Cry review record not found.');return}
 
-    const r = reviews.find(x =>
-      (x.window_id && x.window_id === windowId) ||
-      (!x.window_id && x.audio_event_id === windowId)
-    );
-
-    if(!r){
-      alert('Cry review record not found.');
-      return;
-    }
-
-    let probabilities = {};
-    let uncertaintyReasons = [];
-
-    try{
-      probabilities = r.ai_probabilities_json
-        ? JSON.parse(r.ai_probabilities_json)
-        : {};
-    }catch(e){
-      probabilities = {};
-    }
-
-    try{
-      uncertaintyReasons = r.ai_uncertainty_reasons_json
-        ? JSON.parse(r.ai_uncertainty_reasons_json)
-        : [];
-    }catch(e){
-      uncertaintyReasons = [];
-    }
-
-    const probabilityRows = Object.entries(probabilities)
-      .map(([label,value]) => {
-        const pct = Number(value) * 100;
-
-        return `
-          <div class="cry-probability-row">
-            <span>${esc(label)}</span>
-            <strong>${
-              Number.isFinite(pct)
-                ? pct.toFixed(1) + '%'
-                : '-'
-            }</strong>
-          </div>
-        `;
-      })
-      .join('');
-
-    const uncertaintyHtml = uncertaintyReasons.length
-      ? uncertaintyReasons.map(reason =>
-          `<li>${esc(reason)}</li>`
-        ).join('')
-      : '<li>None reported</li>';
-
-    const m = $('cryReviewModal');
-
-    m.innerHTML = `
-      <div class="cry-review-card">
-
-        <h3>Cry Pattern Review</h3>
-
-        <div class="cry-review-grid">
-
-          <div>
-            <label>Inference Window</label>
-            <div>${esc(r.window_id || r.audio_event_id || '-')}</div>
-          </div>
-
-          <div>
-            <label>Device</label>
-            <div>${esc(r.device_id || '-')}</div>
-          </div>
-
-          <div>
-            <label>Window Start</label>
-            <div>${esc(r.ai_window_start_at || '-')}</div>
-          </div>
-
-          <div>
-            <label>Window End</label>
-            <div>${esc(r.ai_window_end_at || '-')}</div>
-          </div>
-
-          <div>
-            <label>Window Samples</label>
-            <div>${esc(
-              r.ai_window_sample_count ??
-              r.window_sample_count ??
-              '-'
-            )}</div>
-          </div>
-
-          <div>
-            <label>Sample Rate</label>
-            <div>${esc(r.sample_rate || '-')} Hz</div>
-          </div>
-
-          <div>
-            <label>Probable Cry Pattern</label>
-            <div>${esc(r.ai_probable_pattern || 'REVIEW')}</div>
-          </div>
-
-          <div>
-            <label>AI Confidence</label>
-            <div>${
-              r.ai_probability == null
-                ? '-'
-                : (Number(r.ai_probability) * 100).toFixed(1) + '%'
-            }</div>
-          </div>
-
-          <div>
-            <label>AI Decision</label>
-            <div>${esc(r.ai_decision || 'REVIEW')}</div>
-          </div>
-
-          <div>
-            <label>Needs Human Review</label>
-            <div>${
-              Number(r.ai_needs_review) === 1
-                ? 'YES'
-                : 'NO'
-            }</div>
-          </div>
-
-          <div>
-            <label>Model Version</label>
-            <div>${esc(r.ai_model_version || '-')}</div>
-          </div>
-
-          <div>
-            <label>Inference Latency</label>
-            <div>${
-              r.ai_service_inference_ms == null
-                ? '-'
-                : Number(r.ai_service_inference_ms).toFixed(0) + ' ms'
-            }</div>
-          </div>
-
+    const m=$('cryReviewModal');
+    m.innerHTML=`<div class="cry-review-card">
+      <h3>Cry Review</h3>
+      <div class="cry-review-grid">
+        <div class="cry-review-field">
+          <label>Cry Event</label>
+          <div>${esc(r.audio_event_id||'-')}</div>
         </div>
-
-        <h4>Available Probability Distribution</h4>
-
-        <div class="cry-probability-list">
-          ${
-            probabilityRows ||
-            '<div class="muted">No probability distribution available.</div>'
-          }
+        <div class="cry-review-field">
+          <label>AI Pattern</label>
+          <div>${esc(r.ai_probable_pattern||'-')}</div>
         </div>
-
-        <h4>Uncertainty / Review Reasons</h4>
-
-        <ul class="cry-uncertainty-list">
-          ${uncertaintyHtml}
-        </ul>
-
-        <hr>
-
-        <h4>Human Review</h4>
-
-        <label>Human Decision</label>
-
-        <select id="cryHumanDecision">
-          <option value="">Select</option>
-          <option value="CONFIRM">Confirm</option>
-          <option value="CORRECT">Correct</option>
-          <option value="UNABLE_TO_DETERMINE">
-            Unable to determine
-          </option>
-        </select>
-
-        <label>Human Pattern</label>
-
-        <select id="cryHumanPattern">
-          <option value="">Select</option>
-          <option value="HUNGER">Hunger</option>
-          <option value="PAIN">Pain</option>
-          <option value="DISCOMFORT">Discomfort</option>
-          <option value="TIRED">Tired</option>
-          <option value="BURPING">Burping</option>
-          <option value="OTHER">Other</option>
-        </select>
-
-        <label>Training Status</label>
-
-        <select id="cryTrainingStatus">
-          <option value="CANDIDATE">Candidate</option>
-          <option value="APPROVED">Approved</option>
-          <option value="EXCLUDED">Excluded</option>
-        </select>
-
-        <label>Reviewer</label>
-
-        <input
-          id="cryReviewer"
-          value="admin"
-        >
-
-        <label>Evidence / Review Note</label>
-
-        <textarea
-          id="cryEvidenceNote"
-          rows="4"
-          placeholder="Record the human review evidence or correction."
-        ></textarea>
-
-        <div class="cry-review-actions">
-
-          <button
-            class="primary"
-            onclick="saveCryReview(
-              '${esc(r.audio_event_id || '')}',
-              '${esc(r.device_id || deviceId)}',
-              '${esc(r.window_id || '')}'
-            )"
-          >
-            Save Review
-          </button>
-
-          <button
-            onclick="$('cryReviewModal').classList.remove('open')"
-          >
-            Cancel
-          </button>
-
+        <div class="cry-review-field">
+          <label>AI Confidence</label>
+          <div>${r.ai_probability==null?'-':(Number(r.ai_probability)*100).toFixed(1)+'%'}</div>
         </div>
-
+        <div class="cry-review-field">
+          <label>Model Version</label>
+          <div>${esc(r.ai_model_version||'-')}</div>
+        </div>
+        <div class="cry-review-field">
+          <label>Human Decision</label>
+          <select id="cryHumanDecision">
+            <option value="">Select</option>
+            <option value="CONFIRM">Confirm</option>
+            <option value="CORRECT">Correct</option>
+            <option value="UNABLE_TO_DETERMINE">Unable to determine</option>
+          </select>
+        </div>
+        <div class="cry-review-field">
+          <label>Human Pattern</label>
+          <select id="cryHumanPattern">
+            <option value="">Select</option>
+            <option value="HUNGER">Hunger</option>
+            <option value="PAIN">Pain</option>
+            <option value="DISCOMFORT">Discomfort</option>
+            <option value="TIRED">Tired</option>
+            <option value="BURPING">Burping</option>
+            <option value="OTHER">Other</option>
+          </select>
+        </div>
+        <div class="cry-review-field">
+          <label>Training Status</label>
+          <select id="cryTrainingStatus">
+            <option value="CANDIDATE">Candidate</option>
+            <option value="APPROVED">Approved</option>
+            <option value="EXCLUDED">Excluded</option>
+          </select>
+        </div>
+        <div class="cry-review-field">
+          <label>Reviewer</label>
+          <input id="cryReviewer" value="admin">
+        </div>
+        <div class="cry-review-field full">
+          <label>Evidence Note</label>
+          <textarea id="cryEvidenceNote" rows="4" placeholder="Optional evidence or observation"></textarea>
+        </div>
       </div>
-    `;
-
+      <div class="cry-review-actions">
+        <button class="ghost" onclick="closeCryReview()">Cancel</button>
+        <button class="primary" onclick="saveCryReview('${esc(audioEventId)}','${esc(r.device_id||currentDeviceId)}')">Save Review</button>
+      </div>
+    </div>`;
     m.classList.add('open');
-
-  }catch(e){
-    alert(e.message);
-  }
+  }catch(e){alert(e.message)}
 }
-async function saveCryReview(audioEventId,deviceId,windowId){
+
+function closeCryReview(){
+  const m=$('cryReviewModal');
+  m.classList.remove('open');
+  m.innerHTML='';
+}
+
+async function saveCryReview(audioEventId,deviceId){
+  const decision=$('cryHumanDecision').value;
+  const pattern=$('cryHumanPattern').value;
+  if(!decision){alert('Select a human decision.');return}
+  if(decision==='CORRECT'&&!pattern){alert('Select the corrected human pattern.');return}
+
   try{
+    await fetch('/admin/cry-reviews',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        audio_event_id:audioEventId,
+        device_id:deviceId,
+        review_status:'REVIEWED',
+        human_decision:decision,
+        human_pattern:pattern||null,
+        evidence_note:$('cryEvidenceNote').value||null,
+        training_status:$('cryTrainingStatus').value,
+        reviewer:$('cryReviewer').value||null
+      })
+    }).then(async r=>{
+      if(!r.ok)throw Error(await r.text());
+      return r.json();
+    });
 
-    const decision = $('cryHumanDecision').value;
-    const pattern = $('cryHumanPattern').value;
-
-    if(!decision){
-      alert('Please select a human decision.');
-      return;
-    }
-
-    if(
-      decision === 'CORRECT' &&
-      !pattern
-    ){
-      alert('Please select the corrected human pattern.');
-      return;
-    }
-
-    const payload = {
-      audio_event_id: audioEventId,
-      device_id: deviceId,
-      window_id: windowId || null,
-
-      review_status: 'REVIEWED',
-
-      human_decision: decision,
-      human_pattern: pattern || null,
-
-      evidence_note:
-        $('cryEvidenceNote').value || null,
-
-      training_status:
-        $('cryTrainingStatus').value,
-
-      reviewer:
-        $('cryReviewer').value || null
-    };
-
-    await post(
-      '/admin/cry-reviews',
-      payload
-    );
-
-    $('cryReviewModal').classList.remove('open');
-
-    await loadAI();
-
-    alert(
-      'Cry pattern review saved successfully.'
-    );
-
-  }catch(e){
-    alert(e.message);
-  }
+    closeCryReview();
+    loadAI();
+  }catch(e){alert(e.message)}
 }
-async function loadAI(){if(!$('device').value){['crySummary','diaperSummary','modelSummary','inferences','audio'].forEach(id=>$(id).innerHTML='<div class="empty">Select a device to inspect AI runtime.</div>');return}const id=encodeURIComponent($('device').value);const [inf,audio,t,reviews]=await Promise.all([get('/admin/cry-inferences?deviceId='+id+'&limit=80'),get('/admin/audio?deviceId='+id+'&limit=80'),get('/admin/telemetry?limit=1&deviceId='+id),get('/admin/cry-reviews?deviceId='+id+'&limit=80')]);const l=t[0]||{};$('crySummary').innerHTML=`<div class="metricrow"><div class="metricbox"><div class="k">Latest cry</div><div class="v">${l.cry_detected?'DETECTED':'QUIET'}</div></div><div class="metricbox"><div class="k">Probable pattern</div><div class="v">${esc(l.probable_pattern||'Analysingâ€¦')}</div></div></div>`;$('diaperSummary').innerHTML=`<div class="metricrow"><div class="metricbox"><div class="k">Status</div><div class="v">${esc(l.diaper_status||'â€”')}</div></div><div class="metricbox"><div class="k">Weight delta</div><div class="v">${esc(l.diaper_weight_delta_g??'â€”')} g</div></div></div><div class="sub" style="margin-top:10px">${esc(l.diaper_fusion_reason||'Waiting for multi-sensor fusion input.')}</div>`;$('modelSummary').innerHTML=`<div class="healthrow"><span>Cry detector</span><b class="green">${esc(l.cry_model_version||'placeholder')}</b></div><div class="healthrow"><span>Inference history</span><b>${inf.length}</b></div><div class="healthrow"><span>Audio candidates</span><b>${audio.length}</b></div>`;$('inferences').innerHTML=inf.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.model_version)}</td><td>${esc(r.status)}</td><td>${esc(r.probable_pattern||'â€”')}</td><td>${r.probability==null?'â€”':(Number(r.probability)*100).toFixed(1)+'%'}</td><td>${esc(r.inference_ms??'â€”')} ms</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No inference records</td></tr>';$('cryReviews').innerHTML=reviews.map(r=>`<tr><td>${esc(r.occurred_at||r.created_at||'-')}</td><td>${esc(r.audio_event_id||'-')}</td><td>${esc(r.ai_probable_pattern||'-')}</td><td>${r.ai_probability==null?'-':(Number(r.ai_probability)*100).toFixed(1)+'%'}</td><td><button class="btn" onclick="reviewCry('${esc(r.window_id || r.audio_event_id || '')}')">Review</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No cry reviews</td></tr>';$('audio').innerHTML=audio.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.event_id)}</td><td>${esc(r.sample_count??'â€”')}</td><td>${esc(r.model_version)}</td><td>${r.training_eligible?'YES':'NO'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No retained cry events</td></tr>'}
+function showView(v){currentView=v;document.querySelectorAll('.view').forEach(x=>x.classList.toggle('active',x.id===v));document.querySelectorAll('.navbtn').forEach(x=>x.classList.toggle('active',x.dataset.view===v));const meta={command:['Command Center','A live operational view of the Smart Cradle data platform.'],data:['Data Observatory','Inspect the granular telemetry moving through every processing stage.'],ai:['AI & Sensor Fusion','Observe model runtime, cry intelligence and multi-sensor interpretation.'],ops:['Operations','Monitor device, backend, database and pipeline health.']}[v];$('heroTitle').textContent=meta[0];$('heroDesc').textContent=meta[1];if(v==='data')loadData();if(v==='ai')loadAI();if(v==='ops')loadOps()}
+document.querySelectorAll('.navbtn').forEach(b=>b.onclick=()=>showView(b.dataset.view));function focusSection(id){$(id).scrollIntoView({behavior:'smooth',block:'center'})}
+async function loadDevices(){const ds=await get('/admin/devices');$('device').innerHTML='<option value="">All devices</option>'+ds.map(d=>`<option value="${esc(d.deviceId)}">${esc(d.deviceId)}</option>`).join('');if(deviceId)$('device').value=deviceId;return ds}
+async function loadCommand(){const [s,ds,a,t]=await Promise.all([get('/admin/stats'),get('/admin/devices'),get('/admin/anomalies?limit=100'),get('/admin/telemetry?limit=200'+($('device').value?'&deviceId='+encodeURIComponent($('device').value):''))]);$('kpis').innerHTML=[['Devices',s.totalDevices,'Fleet'],['Online',s.online,'Live'],['Telemetry',s.totalTelemetry,'Records'],['AI Inferences',s.totalCryInferences??0,'Model events'],['Training Events',s.totalAudioEvents??0,'Audio retained'],['Anomalies',s.criticalAnomalies??0,'Critical']].map((x,i)=>`<div class="card kpi"><div class="label">${x[0]}</div><div class="num ${i===1?'green':i===5&&x[1]?'red':'blue'}">${x[1]}</div><div class="sub">${x[2]}</div></div>`).join('');$('healthMini').innerHTML=ds.slice(0,6).map(d=>`<div class="healthrow"><span>${esc(d.deviceId)}</span><span class="state"><i class="mini ${d.status==='online'?'':'warn'}"></i>${esc(d.status)}</span></div>`).join('')||'<div class="empty">No hardware devices connected</div>';drawPulse(t);$('aiStatus').textContent=s.totalCryInferences?'ACTIVE':'READY'}
+function drawPulse(records){const rows=(records||[]).filter(r=>r&&r.occurred_at);if(!rows.length){$('pulseChart').innerHTML='<div class="empty">Waiting for live hardware telemetry</div>';return}const now=Date.now();const buckets=Array(24).fill(0);rows.forEach(r=>{const t=Date.parse(r.occurred_at);if(!Number.isFinite(t))return;const mins=(now-t)/60000;if(mins>=0&&mins<24){buckets[Math.min(23,Math.floor(mins))]++;}});const max=Math.max(1,...buckets);const pts=buckets.slice().reverse().map((v,i)=>[i,(v/max)*43]);const path=pts.map((p,i)=>(i?'L':'M')+`${p[0]*(100/23)} ${105-p[1]*2}`).join(' ');$('pulseChart').innerHTML=`<svg viewBox="0 0 100 125" preserveAspectRatio="none"><path d="M0 103 H100" stroke="#19314a"/><path d="M0 78 H100" stroke="#13283e"/><path d="${path}" fill="none" stroke="#4f8cff" stroke-width="1.8" vector-effect="non-scaling-stroke"/><text x="6" y="18" fill="#55718d" font-size="7">${esc(rows.length)} latest hardware telemetry records</text></svg>`}
+async function loadData(){const q=$('device').value?`&deviceId=${encodeURIComponent($('device').value)}`:'';const [t]=await Promise.all([get('/admin/telemetry?limit=80'+q),loadSamples()]);$('telemetry').innerHTML=t.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.device_id)}</td><td>${esc(r.baby_weight??'â€”')}</td><td>${esc(r.baby_height_cm??'â€”')}</td><td>${esc(r.temperature??'â€”')}</td><td>${esc(r.respiratory_rate??'â€”')}</td><td>${esc(r.ammonia_ppm??'â€”')}</td><td>${r.cry_detected?'Detected':'â€”'}</td><td>${esc(r.diaper_status??'â€”')}</td><td><span class="badge">${esc(r.validation_status||'unverified')}</span></td></tr>`).join('')||'<tr><td colspan="10" class="empty">No telemetry</td></tr>';const last=t[0];$('latestLineage').innerHTML=last?`<div class="metricbox"><div class="k">Latest device</div><div class="v">${esc(last.device_id)}</div><div class="sub">${esc(last.occurred_at)}</div></div><div style="margin-top:9px" class="metricbox"><div class="k">Validation decision</div><div class="v">${esc(last.validation_status||'unverified')}</div><div class="sub">Quality is retained internally; caregiver UI remains simplified.</div></div>`:'<div class="empty">Waiting for telemetry</div>'}
+async function loadSamples(){if(!$('device').value){$('samples').innerHTML='<tr><td colspan="6" class="empty">Select a device to inspect granular sensor streams.</td></tr>';return}const s=$('sensor').value?`&sensor=${encodeURIComponent($('sensor').value)}`:'';const x=await get('/admin/samples?deviceId='+encodeURIComponent($('device').value)+'&limit=250'+s);$('samples').innerHTML=x.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.sensor)}</td><td>${esc(r.raw_value)}</td><td>${esc(r.processed_value??'â€”')}</td><td>${esc(r.unit)}</td><td>${esc(r.status)}</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No samples</td></tr>'}
+async function loadAI(){if(!$('device').value){['crySummary','diaperSummary','modelSummary','inferences','audio'].forEach(id=>$(id).innerHTML='<div class="empty">Select a device to inspect AI runtime.</div>');return}const id=encodeURIComponent($('device').value);const [inf,audio,t,reviews]=await Promise.all([get('/admin/cry-inferences?deviceId='+id+'&limit=80'),get('/admin/audio?deviceId='+id+'&limit=80'),get('/admin/telemetry?limit=1&deviceId='+id),get('/admin/cry-reviews?deviceId='+id+'&limit=80')]);const l=t[0]||{};$('crySummary').innerHTML=`<div class="metricrow"><div class="metricbox"><div class="k">Latest cry</div><div class="v">${l.cry_detected?'DETECTED':'QUIET'}</div></div><div class="metricbox"><div class="k">Probable pattern</div><div class="v">${esc(l.probable_pattern||'Analysingâ€¦')}</div></div></div>`;$('diaperSummary').innerHTML=`<div class="metricrow"><div class="metricbox"><div class="k">Status</div><div class="v">${esc(l.diaper_status||'â€”')}</div></div><div class="metricbox"><div class="k">Weight delta</div><div class="v">${esc(l.diaper_weight_delta_g??'â€”')} g</div></div></div><div class="sub" style="margin-top:10px">${esc(l.diaper_fusion_reason||'Waiting for multi-sensor fusion input.')}</div>`;$('modelSummary').innerHTML=`<div class="healthrow"><span>Cry detector</span><b class="green">${esc(l.cry_model_version||'placeholder')}</b></div><div class="healthrow"><span>Inference history</span><b>${inf.length}</b></div><div class="healthrow"><span>Audio candidates</span><b>${audio.length}</b></div>`;$('inferences').innerHTML=inf.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.model_version)}</td><td>${esc(r.status)}</td><td>${esc(r.probable_pattern||'â€”')}</td><td>${r.probability==null?'â€”':(Number(r.probability)*100).toFixed(1)+'%'}</td><td>${esc(r.inference_ms??'â€”')} ms</td></tr>`).join('')||'<tr><td colspan="6" class="empty">No inference records</td></tr>';$('cryReviews').innerHTML=reviews.map(r=>`<tr><td>${esc(r.occurred_at||r.created_at||'-')}</td><td>${esc(r.audio_event_id||'-')}</td><td>${esc(r.ai_probable_pattern||'-')}</td><td>${r.ai_probability==null?'-':(Number(r.ai_probability)*100).toFixed(1)+'%'}</td><td><button class="btn" onclick="reviewCry('${esc(r.audio_event_id||'')}')">Review</button></td></tr>`).join('')||'<tr><td colspan="5" class="empty">No cry reviews</td></tr>';$('audio').innerHTML=audio.map(r=>`<tr><td>${esc(r.occurred_at)}</td><td>${esc(r.event_id)}</td><td>${esc(r.sample_count??'â€”')}</td><td>${esc(r.model_version)}</td><td>${r.training_eligible?'YES':'NO'}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No retained cry events</td></tr>'}
 async function loadOps(){const [ds,ev,an]=await Promise.all([get('/admin/devices'),get('/admin/events?limit=180'),get('/admin/anomalies?limit=100')]);const d=$('device').value?ds.find(x=>x.deviceId===$('device').value):ds[0];$('health').innerHTML=d?`<div class="healthrow"><span>Device</span><b>${esc(d.deviceId)}</b></div><div class="healthrow"><span>Overall status</span><b class="${d.status==='online'?'green':'amber'}">${esc(d.status)}</b></div>`+Object.entries(d.sensorHealth||{}).map(([k,v])=>`<div class="healthrow"><span>${esc(k)}</span><span class="state"><i class="mini ${v==='online'?'':'warn'}"></i>${esc(v)}</span></div>`).join('')+Object.entries(d.pipeline||{}).map(([k,v])=>`<div class="healthrow"><span>Pipeline / ${esc(k)}</span><b>${esc(v)}</b></div>`).join(''):'<div class="empty">No devices connected</div>';$('events').innerHTML=ev.map(r=>`<tr><td>${esc(r.received_at)}</td><td>${esc(r.severity)}</td><td>${esc(r.component)}</td><td>${esc(r.event_type)}</td><td>${esc(r.message)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No events</td></tr>';$('anomalies').innerHTML=an.map(r=>`<tr><td>${esc(r.timestamp)}</td><td>${esc(r.deviceId)}</td><td>${esc(r.severity)}</td><td>${esc(r.type)}</td><td>${esc(r.message)}</td></tr>`).join('')||'<tr><td colspan="5" class="empty">No anomalies</td></tr>'}
 async function refreshAll(){try{await loadDevices();await loadCommand();if(currentView==='data')await loadData();if(currentView==='ai')await loadAI();if(currentView==='ops')await loadOps();$('liveText').textContent='LIVE DATA LINK Â· '+new Date().toLocaleTimeString()}catch(e){console.error(e);$('liveText').textContent='DATA LINK ERROR'}}
 $('device').addEventListener('change',()=>{deviceId=$('device').value;refreshAll()});$('sensor').addEventListener('change',loadSamples);refreshAll();setInterval(refreshAll,10000);
 </script></body></html>
-
-
-
-
-
-
 
 
 

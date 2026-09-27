@@ -81,8 +81,8 @@ char mqttTopicAudio[64];
 // PIN MAPPING
 // ------------------------------------------------------------------
 const int PIN_MQ137_AIN  = A0;
-const int PIN_HX711_DOUT = D0;
-const int PIN_HX711_SCK  = D1;
+const int PIN_HX711_DOUT = D2;
+const int PIN_HX711_SCK  = D3;
 
 HX711 loadCell;
 Adafruit_MLX90640 thermalSensor;

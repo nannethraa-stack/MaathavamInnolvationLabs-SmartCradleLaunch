@@ -5,8 +5,8 @@
 
 #include <HX711.h>
 
-const int DT_PIN = D0;
-const int SCK_PIN = D1;
+const int DT_PIN = D2;
+const int SCK_PIN = D3;
 
 HX711 scale;
 
@@ -29,7 +29,7 @@ void setup() {
     Serial.println("If reading changes when you press on the load cell, it's working.");
   } else {
     Serial.println("ERROR: HX711 not responding");
-    Serial.println("Check wiring: DT -> D0, SCK -> D1, VCC -> 5V, GND -> GND");
+    Serial.println("Check wiring: DT -> D2, SCK -> D3, VCC -> 5V, GND -> GND");
   }
 }
 

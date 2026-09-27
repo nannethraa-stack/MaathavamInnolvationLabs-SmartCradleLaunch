@@ -1,0 +1,96 @@
+SMART CRADLE CRY PATTERN CNN BOOTSTRAP
+=======================================
+Dataset: Donate-a-Cry
+Purpose: bootstrap cry-pattern experiment
+NOT production Smart Cradle model
+
+Windows: 2035
+Source recordings: 221
+Classes: ['belly_pain', 'burping', 'discomfort', 'hungry', 'tired']
+Evaluation: 5-fold source-grouped CV
+Epochs: 15
+Batch size: 32
+Learning rate: 0.001
+
+FOLD 1
+Windows: 398
+Macro-F1: 0.1213
+              precision    recall  f1-score   support
+
+  belly_pain       0.00      0.00      0.00        16
+     burping       0.00      0.00      0.00         4
+  discomfort       0.05      0.67      0.10        21
+      hungry       0.85      0.36      0.51       318
+       tired       0.00      0.00      0.00        39
+
+    accuracy                           0.32       398
+   macro avg       0.18      0.21      0.12       398
+weighted avg       0.68      0.32      0.41       398
+
+FOLD 2
+Windows: 411
+Macro-F1: 0.0293
+              precision    recall  f1-score   support
+
+  belly_pain       0.03      0.92      0.06        13
+     burping       0.00      0.00      0.00        15
+  discomfort       0.00      0.00      0.00        32
+      hungry       0.75      0.05      0.09       328
+       tired       0.00      0.00      0.00        23
+
+    accuracy                           0.07       411
+   macro avg       0.16      0.19      0.03       411
+weighted avg       0.60      0.07      0.07       411
+
+FOLD 3
+Windows: 407
+Macro-F1: 0.1692
+              precision    recall  f1-score   support
+
+  belly_pain       0.00      0.00      0.00         0
+     burping       0.00      0.00      0.00        10
+  discomfort       0.00      0.00      0.00        19
+      hungry       0.94      0.77      0.85       374
+       tired       0.00      0.00      0.00         4
+
+    accuracy                           0.71       407
+   macro avg       0.19      0.15      0.17       407
+weighted avg       0.86      0.71      0.78       407
+
+FOLD 4
+Windows: 415
+Macro-F1: 0.1743
+              precision    recall  f1-score   support
+
+  belly_pain       0.02      0.02      0.02        45
+     burping       0.00      0.00      0.00         5
+  discomfort       0.07      0.04      0.05        24
+      hungry       0.75      0.85      0.80       312
+       tired       0.00      0.00      0.00        29
+
+    accuracy                           0.64       415
+   macro avg       0.17      0.18      0.17       415
+weighted avg       0.57      0.64      0.60       415
+
+FOLD 5
+Windows: 404
+Macro-F1: 0.1885
+              precision    recall  f1-score   support
+
+  belly_pain       0.00      0.00      0.00         0
+     burping       0.00      0.00      0.00         4
+  discomfort       0.00      0.00      0.00        24
+      hungry       0.90      0.99      0.94       362
+       tired       0.00      0.00      0.00        14
+
+    accuracy                           0.89       404
+   macro avg       0.18      0.20      0.19       404
+weighted avg       0.80      0.89      0.84       404
+
+SUMMARY
+=======
+Mean Macro-F1: 0.1365
+Std Macro-F1: 0.0582
+
+Model artifact: C:\Users\Yoga\Downloads\smart-cradle-enterprise-observatory-hardware-only\ml\models\donateacry_cnn_bootstrap.pt
+Metadata artifact: C:\Users\Yoga\Downloads\smart-cradle-enterprise-observatory-hardware-only\ml\models\donateacry_cnn_bootstrap.json

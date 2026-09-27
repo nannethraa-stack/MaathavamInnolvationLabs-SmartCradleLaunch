@@ -1,6 +1,3 @@
-const { RollingAudioBuffer } = require('./rolling-audio-buffer');
-const rollingAudioBuffers = new Map();
-
 const mqtt = require('mqtt');
 const db = require('./db');
 const monitoring = require('./monitoring');
@@ -149,205 +146,27 @@ function start() {
       }
 
       if (channel === 'audio') {
-        /*
-         * Always store the original MQTT audio chunk.
-         * These raw chunks remain the source material for later curation.
-         */
         db.insertAudioEvent(data);
-
         db.insertSystemEvent({
-          event_id: data.event_id,
-          device_id: deviceId,
-          occurred_at: data.occurred_at,
-          event_type: 'AUDIO_EVENT_STORED',
-          component: 'audio_pipeline',
-          severity: 'info',
+          event_id: data.event_id, device_id: deviceId, occurred_at: data.occurred_at,
+          event_type: 'AUDIO_EVENT_STORED', component: 'audio_pipeline', severity: 'info',
           message: 'Cry audio segment stored as a training candidate.',
-          metadata: {
-            model_version:
-              data.payload?.model_version ||
-              data.model_version ||
-              'cry-detector-placeholder',
-            training_eligible:
-              !!(
-                data.payload?.training_eligible ??
-                data.training_eligible
-              )
-          }
+          metadata: { model_version: data.payload?.model_version || 'cry-detector-placeholder',
+                      training_eligible: !!data.payload?.training_eligible }
         });
+        broadcast({ type: 'audio', deviceId, data });
 
-        broadcast({
-          type: 'audio',
-          deviceId,
-          data
-        });
-
-        /*
-         * The firmware currently sends short PCM chunks.
-         * Do NOT send those chunks directly to the ML model.
-         *
-         * Decode them and accumulate by SAMPLE COUNT.
-         */
-        try {
-          const base64Audio =
-            data.data_base64 ||
-            data.audio_base64 ||
-            data.payload?.data ||
-            data.payload?.data_base64 ||
-            data.payload?.audio_base64;
-
-          if (!base64Audio) {
-            throw new Error(
-              'Audio event does not contain a PCM base64 payload'
-            );
-          }
-
-          const sampleRate =
-            Number(
-              data.sample_rate ||
-              data.payload?.sample_rate ||
-              0
-            );
-
-          if (sampleRate !== 16000) {
-            throw new Error(
-              `Unsupported audio sample rate: ${sampleRate}; expected 16000`
-            );
-          }
-
-          const format =
-            data.format ||
-            data.payload?.format ||
-            'pcm_s16le_base64';
-
-          if (format !== 'pcm_s16le_base64') {
-            throw new Error(
-              `Unsupported audio format: ${format}`
-            );
-          }
-
-          const pcmBuffer = Buffer.from(
-            base64Audio,
-            'base64'
-          );
-
-          let rollingBuffer =
-            rollingAudioBuffers.get(deviceId);
-
-          if (!rollingBuffer) {
-            rollingBuffer =
-              new RollingAudioBuffer(deviceId);
-
-            rollingAudioBuffers.set(
-              deviceId,
-              rollingBuffer
-            );
-          }
-
-          const windows = rollingBuffer.addChunk({
-            pcmBuffer,
-            eventId: data.event_id,
-            occurredAt: data.occurred_at
-          });
-
-          if (windows.length > 0) {
-            db.insertSystemEvent({
-              event_id: data.event_id,
-              device_id: deviceId,
-              occurred_at: data.occurred_at,
-              event_type: 'AUDIO_ROLLING_WINDOW_READY',
-              component: 'audio_pipeline',
-              severity: 'info',
-              message:
-                `${windows.length} complete 3-second ML window(s) ready.`,
-              metadata: {
-                window_samples: 48000,
-                hop_samples: 16000,
-                buffered_samples:
-                  rollingBuffer.getBufferedSamples()
-              }
-            });
-          }
-
-          /*
-           * Run ML only on complete 3-second windows.
-           */
-          for (const window of windows) {
-            const windowForModel = {
-              audio_base64:
-                window.audioBuffer.toString('base64'),
-
-              sample_rate: window.sampleRate,
-
-              device_id: window.deviceId,
-
-              window_id: window.windowId,
-
-              first_event_id:
-                window.firstEventId,
-
-              last_event_id:
-                window.lastEventId,
-
-              source_event_ids:
-                window.sourceEventIds,
-
-              sample_count:
-                window.sampleCount,
-
-              window_start_at:
-                window.windowStartAt,
-
-              window_end_at:
-                window.windowEndAt,
-
-              occurred_at:
-                window.windowEndAt ||
-                data.occurred_at
-            };
-
-            cryModel.analyze(windowForModel)
-              .then(result => {
-                db.insertCryInference(result);
-
-                db.updateLatestCryPattern(
-                  deviceId,
-                  result.probable_pattern,
-                  result.model_version,
-                  result.probability
-                );
-
-                broadcast({
-                  type: 'cry_inference',
-                  deviceId,
-                  data: result
-                });
-              })
-              .catch(error => {
-                console.error(
-                  'Rolling cry model error:',
-                  error.message
-                );
-              });
-          }
-        } catch (error) {
-          console.error(
-            'Rolling audio pipeline error:',
-            error.message
-          );
-
-          db.insertSystemEvent({
-            event_id: data.event_id,
-            device_id: deviceId,
-            occurred_at: data.occurred_at,
-            event_type: 'AUDIO_PIPELINE_ERROR',
-            component: 'audio_pipeline',
-            severity: 'warning',
-            message: error.message,
-            metadata: {}
-          });
+        // Optional external/local ML service. The adapter is deliberately
+        // pluggable so a Kaggle-trained model can be deployed later without
+        // changing the dashboard contract.
+        const audioEvent = db.getAudioEventById(data.event_id);
+        if (audioEvent) {
+          cryModel.analyze(audioEvent).then(result => {
+            db.insertCryInference(result);
+            db.updateLatestCryPattern(deviceId, result.probable_pattern, result.model_version, result.probability);
+            broadcast({ type: 'cry_inference', deviceId, data: result });
+          }).catch(error => console.error('Cry model error:', error.message));
         }
-
         return;
       }
 
@@ -377,5 +196,3 @@ function start() {
 }
 
 module.exports = { start, setBroadcast };
-
-

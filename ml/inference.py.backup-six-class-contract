@@ -1,0 +1,309 @@
+import json
+from pathlib import Path
+
+import librosa
+import numpy as np
+import torch
+import torch.nn as nn
+
+
+BASE_DIR = Path(__file__).resolve().parent
+
+MODEL_PATH = BASE_DIR / "models" / "donateacry_cnn_bootstrap.pt"
+METADATA_PATH = BASE_DIR / "models" / "donateacry_cnn_bootstrap.json"
+
+TARGET_SR = 16000
+WINDOW_SECONDS = 3
+N_MELS = 64
+N_FFT = 1024
+HOP_LENGTH = 256
+
+CONFIDENCE_THRESHOLD = 0.75
+MARGIN_THRESHOLD = 0.20
+
+
+# Current bootstrap model labels -> production terminology
+LABEL_MAP = {
+    "hungry": "HUNGER",
+    "belly_pain": "PAIN",
+    "discomfort": "DISCOMFORT",
+    "tired": "TIRED",
+    "burping": "BURPING",
+}
+
+
+class CryCNN(nn.Module):
+    def __init__(self, num_classes):
+        super().__init__()
+
+        self.features = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+
+            nn.AdaptiveAvgPool2d((1, 1)),
+        )
+
+        self.classifier = nn.Linear(64, num_classes)
+
+    def forward(self, x):
+        x = self.features(x)
+        x = torch.flatten(x, 1)
+        return self.classifier(x)
+
+
+class CryInference:
+    """
+    Bootstrap cry-pattern inference.
+
+    IMPORTANT:
+    This is not a production Smart Cradle model.
+    The current model has no NON-CRY or OTHER training data.
+    """
+
+    def __init__(self):
+        if not MODEL_PATH.exists():
+            raise FileNotFoundError(
+                f"Model artifact not found: {MODEL_PATH}"
+            )
+
+        if not METADATA_PATH.exists():
+            raise FileNotFoundError(
+                f"Model metadata not found: {METADATA_PATH}"
+            )
+
+        with METADATA_PATH.open(encoding="utf-8") as f:
+            self.metadata = json.load(f)
+
+        self.model_version = self.metadata["model_version"]
+        self.model_status = self.metadata["model_status"]
+        self.labels = self.metadata["dataset"]["classes"]
+
+        self.device = torch.device("cpu")
+
+        checkpoint = torch.load(
+            MODEL_PATH,
+            map_location=self.device,
+        )
+
+        self.model = CryCNN(
+            num_classes=checkpoint["num_classes"]
+        )
+
+        self.model.load_state_dict(
+            checkpoint["model_state_dict"]
+        )
+
+        self.model.to(self.device)
+        self.model.eval()
+
+    @staticmethod
+    def audio_to_logmel(audio):
+        """
+        Convert exactly one 3-second audio window
+        into the same log-mel representation used during training.
+        """
+
+        expected_samples = TARGET_SR * WINDOW_SECONDS
+
+        audio = np.asarray(audio, dtype=np.float32)
+
+        if len(audio) != expected_samples:
+            raise ValueError(
+                f"Expected {expected_samples} samples "
+                f"for a {WINDOW_SECONDS}-second window, "
+                f"received {len(audio)}."
+            )
+
+        mel = librosa.feature.melspectrogram(
+            y=audio,
+            sr=TARGET_SR,
+            n_fft=N_FFT,
+            hop_length=HOP_LENGTH,
+            n_mels=N_MELS,
+        )
+
+        logmel = librosa.power_to_db(
+            mel,
+            ref=np.max,
+        )
+
+        if logmel.shape != (64, 188):
+            raise ValueError(
+                f"Unexpected feature shape: {logmel.shape}. "
+                f"Expected (64, 188)."
+            )
+
+        return logmel.astype(np.float32)
+
+    def predict_audio_window(self, audio):
+        """
+        Run inference on exactly one 3-second audio window.
+        """
+
+        logmel = self.audio_to_logmel(audio)
+
+        tensor = torch.from_numpy(logmel)
+        tensor = tensor.unsqueeze(0).unsqueeze(0)
+        tensor = tensor.to(self.device)
+
+        with torch.no_grad():
+            logits = self.model(tensor)
+            probabilities = torch.softmax(logits, dim=1)[0]
+
+        probabilities_np = probabilities.cpu().numpy()
+
+        probability_map = {
+            label: float(probability)
+            for label, probability in zip(
+                self.labels,
+                probabilities_np,
+            )
+        }
+
+        ordered = sorted(
+            probability_map.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+
+        top_label, top_probability = ordered[0]
+
+        if len(ordered) > 1:
+            second_probability = ordered[1][1]
+        else:
+            second_probability = 0.0
+
+        margin = top_probability - second_probability
+
+        mapped_prediction = LABEL_MAP.get(
+            top_label,
+            "OTHER",
+        )
+
+        # The bootstrap model is not production-ready.
+        # Therefore production decisions must remain reviewable.
+        uncertainty_reason = []
+
+        if top_probability < CONFIDENCE_THRESHOLD:
+            uncertainty_reason.append(
+                "low_confidence"
+            )
+
+        if margin < MARGIN_THRESHOLD:
+            uncertainty_reason.append(
+                "low_probability_margin"
+            )
+
+        if self.model_status != "PRODUCTION":
+            uncertainty_reason.append(
+                "bootstrap_model"
+            )
+
+        decision = (
+            "CONFIDENT"
+            if not uncertainty_reason
+            else "REVIEW"
+        )
+
+        return {
+            "model_version": self.model_version,
+            "model_status": self.model_status,
+            "production_ready": self.model_status == "PRODUCTION",
+
+            "prediction_raw": top_label,
+            "prediction": mapped_prediction,
+
+            "confidence": float(top_probability),
+            "margin": float(margin),
+
+            "probabilities": {
+                LABEL_MAP.get(label, label): probability
+                for label, probability in probability_map.items()
+            },
+
+            "decision": decision,
+            "needs_review": decision == "REVIEW",
+            "uncertainty_reasons": uncertainty_reason,
+
+            "feature": {
+                "sample_rate": TARGET_SR,
+                "window_seconds": WINDOW_SECONDS,
+                "n_mels": N_MELS,
+                "n_fft": N_FFT,
+                "hop_length": HOP_LENGTH,
+                "shape": [64, 188],
+            },
+        }
+
+
+def load_audio_window(audio_path):
+    """
+    Load one audio file as a mono 16 kHz signal.
+
+    The file must contain exactly one 3-second inference window.
+    """
+
+    audio, sample_rate = librosa.load(
+        audio_path,
+        sr=TARGET_SR,
+        mono=True,
+    )
+
+    expected_samples = TARGET_SR * WINDOW_SECONDS
+
+    if len(audio) != expected_samples:
+        raise ValueError(
+            f"Audio must contain exactly "
+            f"{WINDOW_SECONDS} seconds "
+            f"({expected_samples} samples). "
+            f"Received {len(audio)} samples."
+        )
+
+    return audio.astype(np.float32)
+
+
+def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Smart Cradle bootstrap cry inference"
+    )
+
+    parser.add_argument(
+        "audio",
+        help="Path to a 3-second audio WAV file",
+    )
+
+    args = parser.parse_args()
+
+    audio_path = Path(args.audio)
+
+    if not audio_path.exists():
+        raise FileNotFoundError(
+            f"Audio file not found: {audio_path}"
+        )
+
+    audio = load_audio_window(audio_path)
+
+    inference = CryInference()
+
+    result = inference.predict_audio_window(audio)
+
+    print(
+        json.dumps(
+            result,
+            indent=2,
+        )
+    )
+
+
+if __name__ == "__main__":
+    main()
