@@ -374,7 +374,7 @@ function getAudioEventById(id) {
 }
 
 function insertCryInference(result) {
-  return db.prepare(`
+  db.prepare(`
     INSERT INTO cry_inferences
     (
       audio_event_id,
