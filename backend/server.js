@@ -121,6 +121,9 @@ app.post('/admin/cry-reviews', express.json({ limit: '1mb' }), (req, res) => {
   }
 
   const allowedDecisions = [
+    'CRY',
+    'NON_CRY',
+    'UNCERTAIN',
     'CONFIRM',
     'CORRECT',
     'UNABLE_TO_DETERMINE'
@@ -175,9 +178,18 @@ app.post('/admin/cry-reviews', express.json({ limit: '1mb' }), (req, res) => {
     });
   }
 
-  if (body.human_decision === 'CORRECT' && !body.human_pattern) {
+  if (
+    ['CRY', 'CORRECT'].includes(body.human_decision) &&
+    !body.human_pattern
+  ) {
     return res.status(400).json({
-      error: 'human_pattern is required when human_decision is CORRECT'
+      error: 'human_pattern is required when the reviewed audio is classified as CRY'
+    });
+  }
+
+  if (body.human_decision === 'NON_CRY' && body.human_pattern) {
+    return res.status(400).json({
+      error: 'human_pattern must be empty for NON_CRY audio'
     });
   }
 
