@@ -65,6 +65,9 @@ const char WIFI_SSID[]      = "YOUR_WIFI_SSID";
 const char WIFI_PASSWORD[]  = "YOUR_WIFI_PASSWORD";
 const char MQTT_BROKER_IP[] = "192.168.1.100";
 const int  MQTT_BROKER_PORT = 1883;
+// Configure these to match the authenticated Mosquitto account on the backend.
+const char MQTT_USERNAME[]    = "YOUR_MQTT_USERNAME";
+const char MQTT_PASSWORD[]    = "YOUR_MQTT_PASSWORD";
 const char DEVICE_UUID[]    = "58e6e461-021b-46bd-a3b5-6465fac3e34b";
 const char FIRMWARE_VER[]   = "fw-2.3.1";
 
@@ -789,6 +792,7 @@ void getISO8601Time(char* buf, size_t len) {
 bool connectMQTT() {
   Serial.print("Connecting to MQTT broker...");
   mqttClient.setId(DEVICE_UUID);
+  mqttClient.setUsernamePassword(MQTT_USERNAME, MQTT_PASSWORD);
   if (!mqttClient.connect(MQTT_BROKER_IP, MQTT_BROKER_PORT)) {
     Serial.print(" failed, error=");
     Serial.println(mqttClient.connectError());
