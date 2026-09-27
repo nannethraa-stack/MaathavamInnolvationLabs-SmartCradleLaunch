@@ -139,6 +139,7 @@ db.exec(`
     training_status TEXT NOT NULL DEFAULT 'CANDIDATE',
     reviewer TEXT,
     reviewed_at DATETIME,
+    window_id TEXT,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
@@ -206,6 +207,7 @@ function ensureColumn(table, column, definition) {
 }
 
 // Safe migrations for databases created by v1/v2.
+ensureColumn('cry_reviews', 'window_id', 'TEXT');
 [
   ['telemetry', 'cry_detected', 'INTEGER'],
   ['telemetry', 'cry_probability', 'REAL'],
