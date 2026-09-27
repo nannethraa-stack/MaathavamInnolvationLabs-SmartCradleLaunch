@@ -16,7 +16,14 @@ app = FastAPI(
     version="0.1.0",
 )
 
-MODEL = CryInference()
+try:
+    MODEL = CryInference()
+    MODEL_LOAD_ERROR = None
+except Exception as exc:
+    # Keep the service available for health/diagnostics when the model artifact
+    # is intentionally absent from Git. Inference returns 503 until provisioned.
+    MODEL = None
+    MODEL_LOAD_ERROR = str(exc)
 
 
 class InferenceRequest(BaseModel):
@@ -29,7 +36,7 @@ class InferenceRequest(BaseModel):
 
 
 def is_production_ready() -> bool:
-    return MODEL.model_status == "PRODUCTION"
+    return MODEL is not None and MODEL.model_status == "PRODUCTION"
 
 
 @app.get("/health")
@@ -37,9 +44,10 @@ def health() -> dict[str, Any]:
     return {
         "service": "smart-cradle-cry-pattern-ml",
         "status": "ok",
-        "model_version": MODEL.model_version,
-        "model_status": MODEL.model_status,
+        "model_version": MODEL.model_version if MODEL else None,
+        "model_status": MODEL.model_status if MODEL else "UNAVAILABLE",
         "production_ready": is_production_ready(),
+        "model_load_error": MODEL_LOAD_ERROR,
         "window_seconds": 3,
         "hop_seconds": 1,
         "sample_rate": 16000,
@@ -48,6 +56,12 @@ def health() -> dict[str, Any]:
 
 @app.post("/infer")
 def infer(request: InferenceRequest) -> dict[str, Any]:
+    if MODEL is None:
+        raise HTTPException(
+            status_code=503,
+            detail="ML model artifact is not provisioned on this host.",
+        )
+
     if request.sample_rate != 16000:
         raise HTTPException(
             status_code=400,
