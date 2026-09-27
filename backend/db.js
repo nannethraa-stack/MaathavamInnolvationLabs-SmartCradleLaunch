@@ -152,6 +152,9 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_cry_reviews_training_status
     ON cry_reviews(training_status);
 
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_cry_reviews_window_unique
+    ON cry_reviews(window_id);
+
   CREATE TABLE IF NOT EXISTS system_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id TEXT,
@@ -436,7 +439,35 @@ function insertCryInference(result) {
 
     result.service_inference_ms ?? null
   );
-}
+
+  const row = db.prepare('SELECT last_insert_rowid() AS id').get();
+
+  // Every completed ML window becomes a human-review candidate. The reviewer
+  // explicitly decides CRY, NON_CRY, or UNCERTAIN; the AI output is never used
+  // as the ground-truth training label.
+  if (result.window_id) {
+    const reviewAudioEventId =
+      result.audio_event_id ||
+      (Array.isArray(result.source_event_ids)
+        ? result.source_event_ids[result.source_event_ids.length - 1]
+        : null);
+
+    if (reviewAudioEventId) {
+      db.prepare(
+        "INSERT OR IGNORE INTO cry_reviews " +
+        "(audio_event_id, device_id, review_status, human_decision, " +
+        "human_pattern, evidence_note, training_status, reviewer, " +
+        "reviewed_at, window_id) " +
+        "VALUES (?, ?, 'NOT_REVIEWED', NULL, NULL, NULL, 'CANDIDATE', NULL, NULL, ?)"
+      ).run(
+        reviewAudioEventId,
+        result.device_id ?? null,
+        result.window_id
+      );
+    }
+  }
+
+  return row.id;
 
 function getCryInferences(deviceId, limit = 100) {
   return db.prepare(`
