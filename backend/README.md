@@ -14,7 +14,7 @@ Node.js backend that receives MQTT data from the Smart Cradle firmware and displ
    npm start
    ```
 
-3. Open browser: http://localhost:3000
+3. Open browser: http://localhost:3001
 
 ## MQTT Broker Setup
 
@@ -29,7 +29,7 @@ mosquitto -v
 Update firmware `MQTT_BROKER_IP` to your PC's IP.
 
 ### Option 2: Public Test Broker (quick testing)
-Default is set to `mqtt://broker.hivemq.com:1883`.
+Default is set to `mqtt://broker.hivemq.com:1883` for development/testing only. For deployment, use the authenticated Mosquitto broker configured by `backend/deploy.sh`.
 Update firmware to publish to the same broker:
 ```cpp
 const char MQTT_BROKER_IP[] = "broker.hivemq.com";
