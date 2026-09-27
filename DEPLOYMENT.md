@@ -35,7 +35,7 @@ Hospital Browser (Dashboard URL)
 | Type | Protocol | Port Range | Source |
 |------|----------|------------|--------|
 | SSH | TCP | 22 | Your IP only |
-| Custom TCP | TCP | 1883 | 0.0.0.0/0 (MQTT) |
+| Custom TCP | TCP | 1883 | Device network(s) only |
 | Custom TCP | TCP | 3001 | 0.0.0.0/0 (Dashboard) |
 
 4. Click **Launch Instance**
@@ -93,6 +93,15 @@ mosquitto -h      # version info
 ---
 
 ## Step 5: Configure Mosquitto MQTT Broker
+
+Set credentials before running `backend/deploy.sh`:
+
+```bash
+export MQTT_USERNAME=smartcradle
+export MQTT_PASSWORD="<strong-random-password>"
+```
+
+The deployment script configures Mosquitto with password authentication and disables anonymous access.
 
 ```bash
 # Create config
@@ -301,3 +310,22 @@ If `CRY_MODEL_URL` is not configured, the system safely records the cry audio ca
 - Put the MQTT broker behind authentication/TLS rather than anonymous public port 1883.
 - Add authentication/authorization in front of `/admin/*` and `/api/share` before clinical or multi-site deployment.
 - Treat stored cry audio as sensitive data and apply retention/access controls before using it for model training.
+
+
+## ML service provisioning
+
+The Python checkpoint (`*.pt`) is intentionally excluded from Git. On the ML host:
+
+```bash
+cd ml
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+
+Provision `ml/models/donateacry_cnn_bootstrap.pt` separately before inference. If it is absent, the ML service stays available for `/health` diagnostics and returns HTTP 503 from `/infer` instead of crashing at startup. The current checkpoint is bootstrap/research-only and is not a production clinical model.
+
+## Security note
+
+MQTT deployment now requires username/password authentication. Restrict AWS port 1883 to actual device networks where possible. HTTPS and application authentication for administrative endpoints remain required before sensitive or clinical use.
