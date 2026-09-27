@@ -105,7 +105,8 @@ class CryInference:
     def __init__(self):
         if not MODEL_PATH.exists():
             raise FileNotFoundError(
-                f"Model artifact not found: {MODEL_PATH}"
+                f"Model artifact not found: {MODEL_PATH}. "
+                "Provision the .pt checkpoint separately; model files are intentionally excluded from Git."
             )
 
         if not METADATA_PATH.exists():
