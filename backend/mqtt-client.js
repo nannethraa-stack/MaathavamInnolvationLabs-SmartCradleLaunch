@@ -1,6 +1,12 @@
 const { RollingAudioBuffer } = require('./rolling-audio-buffer');
 const rollingAudioBuffers = new Map();
 
+function resetRollingAudioBuffer(deviceId) {
+  const buffer = rollingAudioBuffers.get(deviceId);
+  if (buffer) buffer.clear();
+  rollingAudioBuffers.delete(deviceId);
+}
+
 const mqtt = require('mqtt');
 const db = require('./db');
 const monitoring = require('./monitoring');
@@ -130,6 +136,7 @@ function start() {
       if (channel === 'alerts') {
         if (data.event_type === 'PRESENCE_CHANGE') {
           db.insertPresenceChange(data);
+          resetRollingAudioBuffer(deviceId);
         } else {
           db.insertAlert(data);
           monitoring.recordAlert(deviceId, data.payload?.alert_type || 'unknown', JSON.stringify(data.payload));
@@ -376,6 +383,10 @@ function start() {
   return client;
 }
 
-module.exports = { start, setBroadcast };
+module.exports = {
+  start,
+  setBroadcast,
+  resetRollingAudioBuffer
+};
 
 
