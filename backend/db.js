@@ -475,6 +475,7 @@ function insertCryInference(result) {
   }
 
   return row.id;
+}
 
 function getCryInferences(deviceId, limit = 100) {
   return db.prepare(`
