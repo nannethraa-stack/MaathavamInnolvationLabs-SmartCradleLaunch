@@ -1300,3 +1300,172 @@ validated production model
 ```
 
 A maintainer should preserve this separation. The bootstrap model is not the final production model, and collected audio should be curated through human review before it becomes training ground truth.
+
+
+---
+
+# 41. Complete source-to-documentation module map
+
+This section is intentionally file-oriented. The descriptions below are based on the current files in `main`. A file listed as a backup is historical code retained in the repository; it is not the active runtime module unless explicitly stated.
+
+## 41.1 Active backend source files
+
+| File | Actual role in current code | Start here for |
+|---|---|---|
+| `backend/server.js` | Express/HTTP entry point, REST routes, WebSocket server, MQTT startup, share-token routes, review API validation | API surface, startup, WebSocket, review endpoint |
+| `backend/mqtt-client.js` | MQTT connection/subscription, telemetry/alert/audio routing, diaper fusion heuristic, rolling-window invocation, ML invocation and persistence | End-to-end live data path |
+| `backend/rolling-audio-buffer.js` | Node-side per-device PCM buffer; constructs 3-second windows with 1-second hop | Exact live ML window logic |
+| `backend/cry-model.js` | HTTP adapter from Node backend to Python `/infer` service | Node↔Python ML contract |
+| `backend/db.js` | SQLite schema, migrations, inserts, queries, review/training persistence and sharing persistence | Database truth and persistence logic |
+| `backend/monitoring.js` | Device health, stale-device checks, anomaly/alert tracking and health summaries | Health/admin behavior |
+| `backend/mqtt-watch.js` | Standalone MQTT diagnostic subscriber | MQTT troubleshooting |
+| `backend/inspect-db.js` | Small database inspection utility | Quick DB inspection |
+| `backend/inspect-device-status.js` | Small device-status inspection utility | Quick device-status inspection |
+| `backend/deploy.sh` | EC2 deployment automation including Node/PM2/Mosquitto setup | AWS deployment behavior |
+| `backend/package.json` | Backend package metadata, dependencies and start/dev scripts | Runtime dependencies and commands |
+| `backend/package-lock.json` | Locked npm dependency resolution | Reproducible npm install |
+| `backend/README.md` | Backend operational notes | Backend setup notes |
+
+### Backend UI files
+
+| File | Actual role |
+|---|---|
+| `backend/public/index.html` | Main caregiver dashboard |
+| `backend/public/mobile.html` | Token-based shared/mobile snapshot page |
+| `backend/public/admin/index.html` | Admin/engineering observatory and review UI |
+
+## 41.2 Active ML source files
+
+| File | Actual role in current code | Start here for |
+|---|---|---|
+| `ml/inference.py` | Loads/checks bootstrap model, defines CNN inference path, audio contract, label mapping and review/production decision logic | What the model actually receives/returns |
+| `ml/inference_service.py` | FastAPI wrapper exposing `/health` and `/infer`; keeps service alive when checkpoint is unavailable | Service/API behavior |
+| `ml/rolling_buffer.py` | Python rolling-window utility for 16-kHz PCM | Python-side window utility; not the live MQTT buffer |
+| `ml/extract_logmel.py` | Loads Donate-a-Cry source audio, creates 3-second/1-second-hop log-mel features and metadata | Feature extraction |
+| `ml/train_cnn.py` | Donate-a-Cry bootstrap CNN training and grouped CV | Current CNN training experiment |
+| `ml/train_baseline.py` | RandomForest baseline experiment | Baseline evaluation |
+| `ml/create_grouped_cv.py` | Creates 5-fold source-grouped Donate-a-Cry split | Leakage-safe CV split construction |
+| `ml/create_source_split.py` | Creates source-level train/validation/test split | Source-level split alternative |
+| `ml/create_stratified_split.py` | Creates stratified grouped split | Class-balanced grouped split alternative |
+| `ml/preprocess_audio.py` | Current preprocessing utility; its current main path is a dry-run/status path rather than the full preprocessing pipeline | Understanding preprocessing entry point |
+| `ml/requirements.txt` | Pinned Python ML/service dependencies | ML environment |
+
+## 41.3 Firmware source
+
+| File | Actual role |
+|---|---|
+| `firmware/smart_cradle_firmware/smart_cradle_firmware.ino` | Complete current Portenta H7 firmware: initialization, Wi-Fi/NTP/MQTT, presence, thermal, respiratory, load cell, MQ-137, PDM audio, edge RMS cry heuristic, audio capture, camera test frame and MQTT publishers |
+
+The firmware contains the actual sensor constants, thresholds, timing values, MQTT topics and payload construction. For any hardware behavior, inspect this file rather than relying on secondary documentation.
+
+## 41.4 Firmware test modules
+
+The repository contains separate test sketches under:
+
+- `firmware/tests/test_camera/`
+- `firmware/tests/test_hx711/`
+- `firmware/tests/test_mlx90640/`
+- `firmware/tests/test_mq137/`
+- `firmware/tests/test_pdm_mic/`
+- `firmware/tests/test_wifi/`
+
+These are hardware-specific test programs, separate from the main firmware. Their existence does not mean that a current production firmware build automatically runs them.
+
+## 41.5 Model/report artifacts
+
+Tracked ML metadata/report locations currently include:
+
+- `ml/models/donateacry_cnn_bootstrap.json`
+- `ml/reports/baseline_grouped_cv.txt`
+- `ml/reports/cnn_grouped_cv.txt`
+
+The trained `.pt` checkpoint is excluded by the root `.gitignore`; therefore the repository itself does not contain the binary checkpoint needed for live CNN inference.
+
+## 41.6 Historical backup files
+
+The following are retained backup copies, not additional active runtime modules:
+
+### Backend backups
+- `backend/cry-model.js.backup-before-window-adapter`
+- `backend/cry-model.js.backup-ml-integration`
+- `backend/cry-model.js.backup-rolling-pipeline`
+- `backend/db.js.backup-before-review-window`
+- `backend/db.js.backup-ml-integration`
+- `backend/db.js.backup-rolling-pipeline`
+- `backend/db.js.backup-window-schema`
+- `backend/mqtt-client.js.backup-ml-integration`
+- `backend/mqtt-client.js.backup-rolling-pipeline`
+- `backend/server.js.backup-before-review-window`
+- `backend/server.js.backup-before-review-window-final`
+
+### ML backups
+- `ml/inference.py.backup-rolling-pipeline`
+- `ml/inference.py.backup-six-class-contract`
+- `ml/train_cnn.py.backup`
+
+### Admin UI backups
+- `backend/public/admin/index.html.backup-before-navigation-fix`
+- `backend/public/admin/index.html.backup-before-navigation-fix-v2`
+- `backend/public/admin/index.html.backup-before-navigation-fix-v3`
+- `backend/public/admin/index.html.backup-before-review-queue-window-id`
+- `backend/public/admin/index.html.backup-before-review-window`
+- `backend/public/admin/index.html.backup-before-window-ui-final`
+
+These backups are useful for historical comparison/debugging but should not be described as part of the current execution path.
+
+## 41.7 Exact code-path map for the ML pipeline
+
+For a maintainer following one real audio event through the system, inspect these files in this order:
+
+1. `firmware/smart_cradle_firmware/smart_cradle_firmware.ino` — microphone capture and MQTT audio payload creation.
+2. `backend/mqtt-client.js` — receives the MQTT audio message and decodes the base64 PCM payload.
+3. `backend/db.js` — stores the original `audio_events` record.
+4. `backend/rolling-audio-buffer.js` — converts short MQTT chunks into complete 48,000-sample windows.
+5. `backend/cry-model.js` — sends a complete window to the Python service.
+6. `ml/inference_service.py` — validates the HTTP request and calls inference.
+7. `ml/inference.py` — validates the 3-second audio, extracts the log-mel representation, loads the checkpoint and produces the model/decision result.
+8. `backend/mqtt-client.js` — receives the inference result and persists it.
+9. `backend/db.js` — stores `cry_inferences` and creates/maintains the review candidate.
+10. `backend/server.js` — exposes the review API.
+11. `backend/public/admin/index.html` — presents the review queue to the operator.
+
+For the current training experiment, the separate path is:
+
+1. source audio/manifest under the ignored `ml/data/` area;
+2. `ml/create_grouped_cv.py` or one of the split utilities;
+3. `ml/extract_logmel.py`;
+4. `ml/train_cnn.py` or `ml/train_baseline.py`;
+5. `ml/reports/` and `ml/models/` artifacts.
+
+This separation is important: the current live inference path and the Donate-a-Cry training experiment are not the same data pipeline.
+
+## 41.8 Where to inspect each important logic decision
+
+| Logic question | Actual source file |
+|---|---|
+| What makes a baby present/absent? | `firmware/smart_cradle_firmware/smart_cradle_firmware.ino` |
+| What makes edge firmware call audio crying? | `firmware/smart_cradle_firmware/smart_cradle_firmware.ino` |
+| What audio is captured for training? | `firmware/smart_cradle_firmware/smart_cradle_firmware.ino` |
+| How are MQTT audio packets decoded? | `backend/mqtt-client.js` |
+| What constitutes an ML window? | `backend/rolling-audio-buffer.js` |
+| What happens when a presence change arrives? | `backend/mqtt-client.js` |
+| What exact ML HTTP request is sent? | `backend/cry-model.js` |
+| What exact audio/model contract is accepted? | `ml/inference.py`, `ml/inference_service.py` |
+| How are uncertainty/review decisions formed? | `ml/inference.py` |
+| How are inference records stored? | `backend/db.js` |
+| How is a human review validated? | `backend/server.js` |
+| How are review candidates created? | `backend/db.js` |
+| How are training counts calculated? | `backend/db.js` |
+| How are Donate-a-Cry folds created? | `ml/create_grouped_cv.py` |
+| How are log-mel features created? | `ml/extract_logmel.py` |
+| How is the bootstrap CNN trained? | `ml/train_cnn.py` |
+| How is the FastAPI service exposed? | `ml/inference_service.py` |
+| How is the backend deployed to EC2? | `backend/deploy.sh` |
+| What the dashboard actually renders | `backend/public/index.html` |
+| What the admin review UI actually does | `backend/public/admin/index.html` |
+
+## 41.9 Important distinction: documentation vs executable truth
+
+This handover is a navigation and explanation layer. The executable truth remains the source files listed above.
+
+When a future maintainer changes code, the relevant module entry in this document should be updated in the same change. If a statement here cannot be confirmed from the current source, it must be marked as unverified or removed rather than inferred.
